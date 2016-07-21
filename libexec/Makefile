@@ -9,6 +9,7 @@ SUBDIR=	${_atf} \
 	${_comsat} \
 	${_dma} \
 	getty \
+	k_nextboot_helper \
 	${_mail.local} \
 	${_makewhatis.local} \
 	${_mknetid} \

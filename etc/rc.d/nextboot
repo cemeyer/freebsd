@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# $FreeBSD$
+#
+
+# PROVIDE: nextboot
+# REQUIRE: FILESYSTEMS ldconfig
+
+. /etc/rc.subr
+
+name="nextboot"
+desc="Set up kernel nextboot"
+conf_file="/boot/nextboot.conf"
+command="/usr/libexec/k_${name}_helper"
+start_cmd="nextboot_start"
+stop_cmd=":"
+
+nextboot_start()
+{
+	check_startmsgs && echo -n 'Initializing kernel nextboot'
+
+	# Make sure file exists
+	if [ ! -f "${conf_file}" ]; then
+	    touch "${conf_file}"
+	fi
+
+	# Pad to 512 bytes to give us room to overwrite at dump time.
+	while [ $(stat -f %z "${conf_file}") -lt 512 ]; do
+	    echo -n " " >> "${conf_file}"
+	done
+
+	${command} "${conf_file}"
+	check_startmsgs && echo '.'
+}
+
+load_rc_config $name
+run_rc_command "$1"

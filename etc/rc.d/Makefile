@@ -75,6 +75,7 @@ FILES=	DAEMON \
 	netoptions \
 	netwait \
 	newsyslog \
+	nextboot \
 	nfsclient \
 	nfscbd \
 	nfsd \
