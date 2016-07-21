@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/namei.h>
 #include <sys/kernel.h>
+#include <sys/disk.h>
 #include <sys/fcntl.h>
 #include <sys/filio.h>
 #include <sys/stat.h>
@@ -2717,6 +2718,79 @@ bad:
 }
 
 static int
+ufs_set_nextboot(struct vnode *vp, int on, struct thread *td)
+{
+	struct dumperinfo di;
+	struct vnode *devvp;
+	daddr_t diskblkno;
+	struct inode *ip;
+	int error, after;
+	void *token;
+
+	/* Protected by file object's vnode reference */
+	ip = VTOI(vp);
+	token = (void *)(uintptr_t)ip->i_number;
+
+	if (on == 0)
+		return (set_nextboot_info(NULL, td, token));
+
+	if ((vp->v_mount->mnt_flag & MNT_RDONLY) != 0)
+		return (EROFS);
+
+	/* Determine if underlying device supports dump-style IO */
+	devvp = ip->i_devvp;
+	vn_lock(devvp, LK_SHARED | LK_RETRY);
+	error = VOP_OPEN(devvp, FREAD, td->td_ucred, td, NULL);
+	if (error != 0) {
+		VOP_UNLOCK(devvp, 0);
+		printf("XXX%s: VOP_OPEN: %d\n", __func__, error);
+		return (error);
+	}
+
+	error = VOP_IOCTL(devvp, DIOCGDDBWRITER, &di, 0, td->td_ucred,
+	    td);
+	(void)VOP_CLOSE(devvp, FREAD, td->td_ucred, td);
+	VOP_UNLOCK(devvp, 0);
+	if (error != 0) {
+		printf("XXX%s: devvp get ddbwriter: %d\n", __func__, error);
+		return (error);
+	}
+
+	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+
+	error = VOP_BMAP(vp, 0, NULL, &diskblkno, &after, NULL);
+	if (error != 0)
+		goto out;
+	if (diskblkno < 0) {
+		/* Can't use a file with a hole at zero. */
+		error = ENOSPC;
+		goto out;
+	}
+	KASSERT(after >= 0, ("after: %d", after));
+
+	/*
+	 * Adjust "media" offset to the offset of the file's blocks on the
+	 * device.
+	 */
+	di.mediaoffset += dbtob(diskblkno);
+#ifdef INVARIANTS
+	/* Shrink size down to match partition */
+	di.mediasize -= dbtob(diskblkno);
+	KASSERT(devvp->v_bufobj.bo_bsize * (1 + after) <= di.mediasize,
+	    ("media doesn't contain nextboot.conf blocks"));
+#endif
+	di.mediasize = devvp->v_bufobj.bo_bsize * (1 + after);
+
+	error = set_nextboot_info(&di, td, token);
+	if (error == 0)
+		ip->i_flag |= IN_NEXTBOOT;
+
+out:
+	VOP_UNLOCK(vp, 0);
+	return (error);
+}
+
+static int
 ufs_ioctl(struct vop_ioctl_args *ap)
 {
 
@@ -2725,6 +2799,9 @@ ufs_ioctl(struct vop_ioctl_args *ap)
 	case FIOSEEKHOLE:
 		return (vn_bmap_seekhole(ap->a_vp, ap->a_command,
 		    (off_t *)ap->a_data, ap->a_cred));
+	case FIONEXTBOOT:
+		return (ufs_set_nextboot(ap->a_vp, *(int *)ap->a_data,
+		    ap->a_td));
 	default:
 		return (ENOTTY);
 	}

@@ -61,4 +61,6 @@ struct fiodgname_arg {
 #define	FIOSEEKDATA	_IOWR('f', 97, off_t)	/* SEEK_DATA */
 #define	FIOSEEKHOLE	_IOWR('f', 98, off_t)	/* SEEK_HOLE */
 
+#define	FIONEXTBOOT	_IOW('f', 22, int)	/* Set /boot/nextboot.conf */
+
 #endif /* !_SYS_FILIO_H_ */

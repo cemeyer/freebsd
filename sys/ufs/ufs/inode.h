@@ -131,6 +131,8 @@ struct inode {
 
 #define	IN_TRUNCATED	0x0800		/* Journaled truncation pending. */
 
+#define	IN_NEXTBOOT	0x1000		/* Configured nextboot.conf file. */
+
 #define	i_devvp i_ump->um_devvp
 #define	i_umbufobj i_ump->um_bo
 #define	i_dirhash i_un.dirhash
