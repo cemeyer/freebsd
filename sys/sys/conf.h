@@ -343,6 +343,16 @@ int dump_write_pad(struct dumperinfo *, void *, vm_offset_t, off_t, size_t,
 int doadump(boolean_t);
 extern int dumping;		/* system is dumping */
 
+/* Stuff related to kernel-nextboot */
+
+struct nextboot_info {
+	dumper_t *ni_write;	/* Writing function. */
+	u_int	ni_blocksize;	/* Size of block in bytes. */
+	off_t	ni_mediaoffset;	/* Initial offset in bytes. */
+	off_t	ni_mediasize;	/* Space available in bytes. */
+};
+int set_nextboot_info(struct nextboot_info *, struct thread *, void *);
+
 #endif /* _KERNEL */
 
 #endif /* !_SYS_CONF_H_ */

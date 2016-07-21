@@ -153,6 +153,19 @@ int dumping;				/* system is dumping */
 int rebooting;				/* system is rebooting */
 static struct dumperinfo dumper;	/* our selected dumper */
 
+/*
+ * Kernel-nextboot configuration that isn't part of API.
+ */
+static struct nextboot_info_private {
+	struct nextboot_info public;
+	void		*nip_blockbuf;	/* Buffer for padding short blocks */
+	void		*nip_token;	/* Owner token */
+#define	nip_write	public.ni_write
+#define	nip_blocksize	public.ni_blocksize
+#define	nip_mediaoffset	public.ni_mediaoffset
+#define	nip_mediasize	public.ni_mediasize
+} nextbootinfo;
+
 /* Context information for dump-debuggers. */
 static struct pcb dumppcb;		/* Registers. */
 lwpid_t dumptid;			/* Thread ID. */
@@ -928,6 +941,43 @@ mkdumpheader(struct kerneldumpheader *kdh, char *magic, uint32_t archver,
 	if (panicstr != NULL)
 		strlcpy(kdh->panicstring, panicstr, sizeof(kdh->panicstring));
 	kdh->parity = kerneldump_parity(kdh);
+}
+
+int
+set_nextboot_info(struct nextboot_info *ni, struct thread *td, void *token)
+{
+	int error;
+
+	if (td != NULL) {
+		error = priv_check(td, PRIV_SETDUMPER);
+		if (error != 0)
+			return (error);
+	}
+
+	if (ni == NULL) {
+#ifdef INVARIANTS
+		KASSERT(nextbootinfo.nip_token == token,
+		    ("%s: old token %p != token %p", __func__,
+		     nextbootinfo.nip_token, token));
+#else
+		if (nextbootinfo.nip_token != token)
+			return (EINVAL);
+#endif
+
+		if (nextbootinfo.nip_blockbuf != NULL)
+			free(nextbootinfo.nip_blockbuf, M_DUMPER);
+		memset(&nextbootinfo, 0, sizeof(nextbootinfo));
+		return (0);
+	}
+
+	if (nextbootinfo.nip_write != NULL)
+		return (EBUSY);
+
+	nextbootinfo.public = *ni;
+	nextbootinfo.nip_token = token;
+	nextbootinfo.nip_blockbuf = malloc(ni->ni_blocksize, M_DUMPER,
+	    M_WAITOK | M_ZERO);
+	return (0);
 }
 
 #ifdef DDB
