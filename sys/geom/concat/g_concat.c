@@ -323,7 +323,8 @@ g_concat_start(struct bio *bp)
 		g_concat_flush(sc, bp);
 		return;
 	case BIO_GETATTR:
-		if (strcmp("GEOM::kerneldump", bp->bio_attribute) == 0) {
+		if (strcmp("GEOM::kerneldump", bp->bio_attribute) == 0 ||
+		    strcmp("GEOM::kernelddbwrite", bp->bio_attribute) == 0) {
 			g_concat_kernel_dump(bp);
 			return;
 		}

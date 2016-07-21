@@ -1118,7 +1118,8 @@ g_raid_start(struct bio *bp)
 	case BIO_GETATTR:
 		if (!strcmp(bp->bio_attribute, "GEOM::candelete"))
 			g_raid_candelete(sc, bp);
-		else if (!strcmp(bp->bio_attribute, "GEOM::kerneldump"))
+		else if (!strcmp(bp->bio_attribute, "GEOM::kerneldump") ||
+		    !strcmp(bp->bio_attribute, "GEOM::kernelddbwrite"))
 			g_raid_kerneldump(sc, bp);
 		else
 			g_io_deliver(bp, EOPNOTSUPP);

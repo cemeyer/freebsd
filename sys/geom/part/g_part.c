@@ -2220,6 +2220,9 @@ g_part_start(struct bio *bp)
 				    pp->name);
 				return;
 			}
+		}
+		if (!strcmp("GEOM::kerneldump", bp->bio_attribute) ||
+		    !strcmp("GEOM::kernelddbwrite", bp->bio_attribute)) {
 			gkd = (struct g_kerneldump *)bp->bio_data;
 			if (gkd->offset >= pp->mediasize) {
 				g_io_deliver(bp, EIO);

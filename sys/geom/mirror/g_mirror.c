@@ -1134,7 +1134,8 @@ g_mirror_start(struct bio *bp)
 		if (!strcmp(bp->bio_attribute, "GEOM::candelete")) {
 			g_mirror_candelete(bp);
 			return;
-		} else if (strcmp("GEOM::kerneldump", bp->bio_attribute) == 0) {
+		} else if (strcmp("GEOM::kerneldump", bp->bio_attribute) == 0 ||
+		    strcmp("GEOM::kernelddbwrite", bp->bio_attribute) == 0) {
 			g_mirror_kernel_dump(bp);
 			return;
 		}

@@ -54,6 +54,9 @@ void disk_err(struct bio *bp, const char *what, int blkdone, int nl);
 	 * disk label formats.  Don't use it unless you have to.
 	 */
 
+#define	DIOCGDDBWRITER	_IOR('d', 132, struct dumperinfo)
+	/* Get ddb-time write interface for this device. */
+
 #define	DIOCSKERNELDUMP _IOW('d', 133, u_int)	/* Set/Clear kernel dumps */
 	/*
 	 * Enable/Disable (the argument is boolean) the device for kernel

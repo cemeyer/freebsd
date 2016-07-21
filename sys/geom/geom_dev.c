@@ -151,6 +151,23 @@ g_dev_setdumpdev(struct cdev *dev, struct thread *td)
 }
 
 static int
+g_dev_getddbwritedev(struct cdev *dev, struct thread *td, struct dumperinfo *di)
+{
+	struct g_kerneldump kd;
+	struct g_consumer *cp;
+	int error, len;
+
+	cp = dev->si_drv2;
+	len = sizeof(kd);
+	kd.offset = 0;
+	kd.length = OFF_MAX;
+	error = g_io_getattr("GEOM::kernelddbwrite", cp, &len, &kd);
+	if (error == 0)
+		memcpy(di, &kd.di, sizeof(*di));
+	return (error);
+}
+
+static int
 init_dumpdev(struct cdev *dev)
 {
 	struct g_consumer *cp;
@@ -498,6 +515,9 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 			error = g_dev_setdumpdev(NULL, td);
 		else
 			error = g_dev_setdumpdev(dev, td);
+		break;
+	case DIOCGDDBWRITER:
+		error = g_dev_getddbwritedev(dev, td, (void *)data);
 		break;
 	case DIOCGFLUSH:
 		error = g_io_flush(cp);

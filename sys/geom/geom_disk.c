@@ -502,7 +502,8 @@ g_disk_start(struct bio *bp)
 		else if (g_handleattr_uint16_t(bp, "GEOM::hba_subdevice",
 		    dp->d_hba_subdevice))
 			break;
-		else if (!strcmp(bp->bio_attribute, "GEOM::kerneldump"))
+		else if (!strcmp(bp->bio_attribute, "GEOM::kerneldump") ||
+		    !strcmp(bp->bio_attribute, "GEOM::kernelddbwrite"))
 			g_disk_kerneldump(bp, dp);
 		else if (!strcmp(bp->bio_attribute, "GEOM::setstate"))
 			g_disk_setstate(bp, sc);

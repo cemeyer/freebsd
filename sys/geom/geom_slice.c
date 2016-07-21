@@ -283,7 +283,8 @@ g_slice_start(struct bio *bp)
 			g_io_request(bp2, cp);
 			return;
 		}
-		if (!strcmp("GEOM::kerneldump", bp->bio_attribute)) {
+		if (!strcmp("GEOM::kerneldump", bp->bio_attribute) ||
+		    !strcmp("GEOM::kernelddbwrite", bp->bio_attribute)) {
 			struct g_kerneldump *gkd;
 
 			gkd = (struct g_kerneldump *)bp->bio_data;
