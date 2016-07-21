@@ -125,6 +125,7 @@ static struct command db_cmds[] = {
 	{ "where",	db_stack_trace,		CS_OWN,	NULL },
 	{ "bt",		db_stack_trace,		CS_OWN,	NULL },
 	{ "call",	db_fncall,		CS_OWN,	NULL },
+	{ "nextboot",	db_nextboot_cmd,	CS_OWN, NULL },
 	{ "show",	0,			0,	&db_show_table },
 	{ "ps",		db_ps,			0,	NULL },
 	{ "gdb",	db_gdb,			0,	NULL },

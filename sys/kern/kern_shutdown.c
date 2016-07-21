@@ -64,6 +64,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/reboot.h>
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
+#include <sys/sbuf.h>
 #include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
@@ -72,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/watchdog.h>
 
 #include <ddb/ddb.h>
+#include <ddb/db_lex.h>
 
 #include <machine/cpu.h>
 #include <machine/dump.h>
@@ -156,14 +158,11 @@ static struct dumperinfo dumper;	/* our selected dumper */
 /*
  * Kernel-nextboot configuration that isn't part of API.
  */
-static struct nextboot_info_private {
-	struct nextboot_info public;
-	void		*nip_blockbuf;	/* Buffer for padding short blocks */
+static struct nextboot_info {
+	struct dumperinfo nip_dumperinfo;
 	void		*nip_token;	/* Owner token */
-#define	nip_write	public.ni_write
-#define	nip_blocksize	public.ni_blocksize
-#define	nip_mediaoffset	public.ni_mediaoffset
-#define	nip_mediasize	public.ni_mediasize
+#define	nip_write	nip_dumperinfo.dumper
+#define	nip_blockbuf	nip_dumperinfo.blockbuf
 } nextbootinfo;
 
 /* Context information for dump-debuggers. */
@@ -944,7 +943,7 @@ mkdumpheader(struct kerneldumpheader *kdh, char *magic, uint32_t archver,
 }
 
 int
-set_nextboot_info(struct nextboot_info *ni, struct thread *td, void *token)
+set_nextboot_info(struct dumperinfo *di, struct thread *td, void *token)
 {
 	int error;
 
@@ -954,7 +953,7 @@ set_nextboot_info(struct nextboot_info *ni, struct thread *td, void *token)
 			return (error);
 	}
 
-	if (ni == NULL) {
+	if (di == NULL) {
 #ifdef INVARIANTS
 		KASSERT(nextbootinfo.nip_token == token,
 		    ("%s: old token %p != token %p", __func__,
@@ -973,14 +972,178 @@ set_nextboot_info(struct nextboot_info *ni, struct thread *td, void *token)
 	if (nextbootinfo.nip_write != NULL)
 		return (EBUSY);
 
-	nextbootinfo.public = *ni;
+	nextbootinfo.nip_dumperinfo = *di;
 	nextbootinfo.nip_token = token;
-	nextbootinfo.nip_blockbuf = malloc(ni->ni_blocksize, M_DUMPER,
+	nextbootinfo.nip_blockbuf = malloc(di->blocksize, M_DUMPER,
 	    M_WAITOK | M_ZERO);
 	return (0);
 }
 
 #ifdef DDB
+/*
+ * Configure nextboot.  Usage similar to nextboot(8).
+ *
+ * Syntax: nextboot [-k kernel] [-e variable=value] [-o -flag]
+ *
+ * There are some quirks with ddb's lexer.  Kernel and variable names must be C
+ * identifiers (not the full generality of filesystem and environment variable
+ * names).  Values and flags must be unquoted, single C identifiers.
+ *
+ * E.g.:
+ *
+ * nextboot -k goodkernel -e abc=def -o -sv
+ */
+void
+db_nextboot_cmd(db_expr_t dummy1 __unused, bool dummy2 __unused,
+    db_expr_t dummy3 __unused, char *dummy4 __unused)
+{
+	static char buffer[512];
+	static char nextkernelname[128];
+	static char options[128];
+	static char var[4][32];
+	static char value[4][32];
+
+	unsigned i, nvariables = 0;
+	bool anyargs, Dflag;
+	struct sbuf sb;
+	int t, error;
+	off_t n;
+
+	anyargs = false;
+	Dflag = false;
+
+	if (nextbootinfo.nip_write == NULL) {
+		db_printf("Nextboot unconfigured\n");
+		db_skip_to_eol();
+		return;
+	}
+
+	while ((t = db_read_token()) != tEOL) {
+		if (t != tMINUS)
+			goto bad_argument;
+
+		t = db_read_token();
+		if (t != tIDENT || strlen(db_tok_string) != 1)
+			goto bad_argument;
+
+		switch (db_tok_string[0]) {
+		case 'D':
+			if (anyargs)
+				goto Dflag_only;
+			anyargs = true;
+			Dflag = true;
+			break;
+		case 'k':
+			if (Dflag)
+				goto Dflag_only;
+			anyargs = true;
+			t = db_read_token();
+			if (t != tIDENT)
+				goto bad_argument;
+			strlcpy(nextkernelname, db_tok_string,
+			    sizeof(nextkernelname));
+			break;
+		case 'e':
+			if (Dflag)
+				goto Dflag_only;
+			anyargs = true;
+			if (nvariables >= nitems(var)) {
+				db_printf("Too many variables (>%zu)\n", nitems(var));
+				db_flush_lex();
+				return;
+			}
+
+			t = db_read_token();
+			if (t != tIDENT)
+				goto bad_argument;
+
+			strlcpy(var[nvariables], db_tok_string,
+			    sizeof(var[0]));
+
+			t = db_read_token();
+			if (t != tEQ)
+				goto bad_argument;
+			t = db_read_token();
+			if (t != tIDENT)
+				goto bad_argument;
+
+			strlcpy(value[nvariables++], db_tok_string,
+			    sizeof(value[0]));
+			break;
+		case 'o':
+			if (Dflag)
+				goto Dflag_only;
+			anyargs = true;
+			t = db_read_token();
+			if (t != tMINUS)
+				goto bad_argument;
+			t = db_read_token();
+			if (t != tIDENT)
+				goto bad_argument;
+			strlcpy(options, db_tok_string, sizeof(options));
+			break;
+		default:
+			db_printf("Bad flag '%c'\n", db_tok_string[0]);
+			goto usage;
+		}
+	}
+
+	if (!anyargs)
+		goto usage;
+
+	sbuf_new(&sb, buffer, sizeof(buffer), SBUF_FIXEDLEN);
+	if (Dflag) {
+		for (n = 0; n < nextbootinfo.nip_dumperinfo.mediasize; n++)
+			sbuf_putc(&sb, ' ');
+	} else {
+		sbuf_cat(&sb, "nextboot_enable=\"YES\"\n");
+		if (nextkernelname[0] != '\0')
+			sbuf_printf(&sb, "kernel=\"%s\"\n", nextkernelname);
+		for (i = 0; i < nvariables; i++)
+			sbuf_printf(&sb, "%s=\"%s\"\n", var[i], value[i]);
+		for (i = 0; options[i] != '\0'; i++)
+			sbuf_printf(&sb, "kernel_options=\"-%c\"\n", options[i]);
+	}
+
+	error = sbuf_finish(&sb);
+	if (error != 0)
+		db_printf("Error printing nextboot.conf: %d\n", error);
+	else {
+		size_t dummysize;
+
+		error = dump_write_pad(&nextbootinfo.nip_dumperinfo,
+		    sbuf_data(&sb), 0, nextbootinfo.nip_dumperinfo.mediaoffset,
+		    sbuf_len(&sb), &dummysize);
+		(void)dummysize;
+
+		if (error != 0)
+			db_printf("Error writing nextboot.conf: %d\n", error);
+	}
+	return;
+
+bad_argument:
+	db_printf("Bad argument\n");
+	db_flush_lex();
+	return;
+
+Dflag_only:
+	db_printf("-D flag can't be combined with other options\n");
+	db_flush_lex();
+	return;
+
+usage:
+	db_printf("Usage: nextboot [-k kernelname] [-e var=val] "
+	    "[-o -options] [-D]\n"
+	    "  -k kernelname  Select this kernel next boot\n"
+	    "  -e var=val     Set environmental variable 'var' to "
+	    "'val' next boot\n"
+	    "  -o -flags      Set flags next boot\n"
+	    "  -D             Clear existing nextboot configuration\n"
+	    );
+	db_flush_lex();
+	return;
+}
+
 DB_SHOW_COMMAND(panic, db_show_panic)
 {
 
