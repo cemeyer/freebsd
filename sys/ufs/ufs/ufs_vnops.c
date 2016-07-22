@@ -903,6 +903,8 @@ void
 ufs_clear_nextboot(struct inode *ip)
 {
 
+	printf("XXX%s: inode %u\n", __func__, ip->i_number);
+
 	KASSERT((ip->i_flag & IN_NEXTBOOT) != 0, ("%p not NEXTBOOT inode", ip));
 	ip->i_flag &= ~IN_NEXTBOOT;
 	set_nextboot_info(NULL, NULL, (void *)(uintptr_t)ip->i_number);
@@ -2818,6 +2820,9 @@ ufs_set_nextboot(struct vnode *vp, int on, struct thread *td)
 	    ("media doesn't contain nextboot.conf blocks"));
 #endif
 	di.mediasize = devvp->v_bufobj.bo_bsize * (1 + after);
+
+	printf("XXX%s: mediaoffset=%jd mediasize=%jd\n", __func__,
+	    (intmax_t)di.mediaoffset, (intmax_t)di.mediasize);
 
 	error = set_nextboot_info(&di, td, token);
 	if (error == 0)
