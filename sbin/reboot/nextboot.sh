@@ -128,3 +128,4 @@ EOF
 fsync ${nextboot_tmp}
 
 mv ${nextboot_tmp} ${nextboot_file}
+/usr/libexec/k_nextboot_helper ${nextboot_file}
