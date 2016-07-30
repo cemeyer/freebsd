@@ -899,6 +899,18 @@ good:
 	return (error);
 }
 
+void
+ufs_clear_nextboot(struct inode *ip)
+{
+
+	KASSERT((ip->i_flag & IN_NEXTBOOT) != 0, ("%p not NEXTBOOT inode", ip));
+	ip->i_flag &= ~IN_NEXTBOOT;
+	set_nextboot_info(NULL, NULL, (void *)(uintptr_t)ip->i_number);
+	UFS_LOCK(ip->i_ump);
+	ip->i_ump->um_nextboot_ino = 0;
+	UFS_UNLOCK(ip->i_ump);
+}
+
 static int
 ufs_remove(ap)
 	struct vop_remove_args /* {
@@ -924,8 +936,11 @@ ufs_remove(ap)
 	ufs_gjournal_orphan(vp);
 #endif
 	error = ufs_dirremove(dvp, ip, ap->a_cnp->cn_flags, 0);
-	if (ip->i_nlink <= 0)
+	if (ip->i_nlink <= 0) {
 		vp->v_vflag |= VV_NOSYNC;
+		if ((ip->i_flag & IN_NEXTBOOT) != 0)
+			ufs_clear_nextboot(ip);
+	}
 	if ((ip->i_flags & SF_SNAPSHOT) != 0) {
 		/*
 		 * Avoid deadlock where another thread is trying to
@@ -986,6 +1001,8 @@ ufs_link(ap)
 		error = EPERM;
 		goto out;
 	}
+	if (ip->i_flag & IN_NEXTBOOT)
+		ufs_clear_nextboot(ip);
 	ip->i_effnlink++;
 	ip->i_nlink++;
 	DIP_SET(ip, i_nlink, ip->i_nlink);
@@ -1323,6 +1340,11 @@ relock:
 	if (fip->i_effnlink == 0 || fdp->i_effnlink == 0 ||
 	    tdp->i_effnlink == 0)
 		panic("Bad effnlink fip %p, fdp %p, tdp %p", fip, fdp, tdp);
+
+	if ((fip->i_flag & IN_NEXTBOOT) != 0)
+		ufs_clear_nextboot(fip);
+	if (tip != NULL && (tip->i_flag & IN_NEXTBOOT) != 0)
+		ufs_clear_nextboot(tip);
 
 	/*
 	 * 1) Bump link count while we're moving stuff
@@ -2720,22 +2742,37 @@ bad:
 static int
 ufs_set_nextboot(struct vnode *vp, int on, struct thread *td)
 {
+	struct ufsmount *ump;
 	struct dumperinfo di;
 	struct vnode *devvp;
 	daddr_t diskblkno;
 	struct inode *ip;
 	int error, after;
 	void *token;
+	bool locked;
+
+	locked = false;
 
 	/* Protected by file object's vnode reference */
 	ip = VTOI(vp);
 	token = (void *)(uintptr_t)ip->i_number;
 
-	if (on == 0)
-		return (set_nextboot_info(NULL, td, token));
+	if (on == 0) {
+		ufs_clear_nextboot(ip);
+		return (0);
+	}
 
 	if ((vp->v_mount->mnt_flag & MNT_RDONLY) != 0)
 		return (EROFS);
+
+	ump = VFSTOUFS(vp->v_mount);
+	UFS_LOCK(ump);
+	if (ump->um_nextboot_ino != 0) {
+		UFS_UNLOCK(ump);
+		return (EBUSY);
+	}
+	ump->um_nextboot_ino = ip->i_number;
+	UFS_UNLOCK(ump);
 
 	/* Determine if underlying device supports dump-style IO */
 	devvp = ip->i_devvp;
@@ -2744,7 +2781,7 @@ ufs_set_nextboot(struct vnode *vp, int on, struct thread *td)
 	if (error != 0) {
 		VOP_UNLOCK(devvp, 0);
 		printf("XXX%s: VOP_OPEN: %d\n", __func__, error);
-		return (error);
+		goto out;
 	}
 
 	error = VOP_IOCTL(devvp, DIOCGDDBWRITER, &di, 0, td->td_ucred,
@@ -2753,10 +2790,11 @@ ufs_set_nextboot(struct vnode *vp, int on, struct thread *td)
 	VOP_UNLOCK(devvp, 0);
 	if (error != 0) {
 		printf("XXX%s: devvp get ddbwriter: %d\n", __func__, error);
-		return (error);
+		goto out;
 	}
 
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+	locked = true;
 
 	error = VOP_BMAP(vp, 0, NULL, &diskblkno, &after, NULL);
 	if (error != 0)
@@ -2786,7 +2824,13 @@ ufs_set_nextboot(struct vnode *vp, int on, struct thread *td)
 		ip->i_flag |= IN_NEXTBOOT;
 
 out:
-	VOP_UNLOCK(vp, 0);
+	if (locked)
+		VOP_UNLOCK(vp, 0);
+	if (error != 0) {
+		UFS_LOCK(ump);
+		ump->um_nextboot_ino = 0;
+		UFS_UNLOCK(ump);
+	}
 	return (error);
 }
 

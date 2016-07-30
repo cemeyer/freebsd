@@ -710,6 +710,9 @@ ffs_write(ap)
 	if (vn_rlimit_fsize(vp, uio, uio->uio_td))
 		return (EFBIG);
 
+	if ((ip->i_flag & IN_NEXTBOOT) != 0)
+		ufs_clear_nextboot(ip);
+
 	resid = uio->uio_resid;
 	osize = ip->i_size;
 	if (seqcount > BA_SEQMAX)

@@ -1692,6 +1692,10 @@ ffs_vgetf(mp, ino, flags, vpp, ffs_flags)
 	ip->i_fs = fs;
 	ip->i_dev = dev;
 	ip->i_number = ino;
+	UFS_LOCK(ump);
+	if (ino == ump->um_nextboot_ino)
+		ip->i_flag |= IN_NEXTBOOT;
+	UFS_UNLOCK(ump);
 	ip->i_ea_refs = 0;
 	ip->i_nextclustercg = -1;
 #ifdef QUOTA

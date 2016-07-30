@@ -212,6 +212,8 @@ ffs_truncate(vp, length, flags, cred)
 	if (error)
 		return (error);
 #endif
+	if ((ip->i_flag & IN_NEXTBOOT) != 0)
+		ufs_clear_nextboot(ip);
 	/*
 	 * Historically clients did not have to specify which data
 	 * they were truncating. So, if not specified, we assume

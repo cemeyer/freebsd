@@ -88,6 +88,7 @@ struct ufsmount {
 	int	um_writesuspended;		/* suspension in progress */
 	u_int	um_trim_inflight;
 	struct taskqueue *um_trim_tq;
+	ino_t	um_nextboot_ino;
 	int	(*um_balloc)(struct vnode *, off_t, int, struct ucred *,
 		    int, struct buf **);
 	int	(*um_blkatoff)(struct vnode *, off_t, char **, struct buf **);
