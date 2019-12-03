@@ -150,3 +150,5 @@ device		firmware	# firmware assist module
 device		bpf		# Berkeley packet filter
 
 options 	FDT
+
+options 	RANDOM_FENESTRASX

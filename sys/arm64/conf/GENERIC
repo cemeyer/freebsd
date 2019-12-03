@@ -348,3 +348,5 @@ device		acpi
 
 # DTBs
 makeoptions	MODULES_EXTRA="dtb/allwinner dtb/mv dtb/rockchip dtb/rpi"
+
+options 	RANDOM_FENESTRASX

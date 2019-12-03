@@ -251,3 +251,5 @@ device		sound		# Generic sound driver (required)
 device		snd_audiocs	# Crystal Semiconductor CS4231
 device		snd_es137x	# Ensoniq AudioPCI ES137x
 device		snd_t4dwave	# Acer Labs M5451
+
+options 	RANDOM_FENESTRASX

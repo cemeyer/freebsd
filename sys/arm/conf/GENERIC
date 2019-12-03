@@ -293,3 +293,4 @@ makeoptions	MODULES_EXTRA+="allwinner"
 makeoptions	MODULES_EXTRA+="arm_ti"
 makeoptions	MODULES_EXTRA+="imx"
 
+options 	RANDOM_FENESTRASX
