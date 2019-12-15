@@ -59,6 +59,22 @@ struct vdso_timekeep {
 #define	VDSO_TH_ALGO_3		0x3
 #define	VDSO_TH_ALGO_4		0x4
 
+struct vdso_fxrng_generation {
+	/* The first field is used only by LP64 kernels. */
+	uint64_t	fx_generation;
+	/* The latter is used by ILP32 kernels and COMPAT32 LP64 kernel. */
+	uint32_t	fx_generation32;
+	/*
+	 * The sometimes unused 64-bit field allows 32-bit programs not to care
+	 * if they are running on ILP32 or COMPAT32 LP64 kernel for such
+	 * architectures.
+	 */
+	uint32_t	fx_vdso_version;	/* 1 */
+};
+#define	VDSO_FXRNG_DISABLED	0x0
+#define	VDSO_FXRNG_VER_1	0x1
+#define	VDSO_FXRNG_VER_CURR	VDSO_FXRNG_VER_1
+
 #ifndef _KERNEL
 
 struct timespec;
@@ -82,6 +98,9 @@ struct vdso_sv_tk {
 	uint32_t	sv_timekeep_gen;
 };
 
+#ifdef RANDOM_FENESTRASX
+void fxrng_push_seed_generation(uint64_t gen);
+#endif
 void timekeep_push_vdso(void);
 
 uint32_t tc_fill_vdso_timehands(struct vdso_timehands *vdso_th);

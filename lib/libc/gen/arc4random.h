@@ -24,9 +24,30 @@
 /*
  * Stub functions for portability.
  */
+#include <sys/elf.h>
+#include <sys/endian.h>
 #include <sys/mman.h>
+#include <sys/time.h>	/* for sys/vdso.h only. */
+#include <sys/vdso.h>
+#include <machine/atomic.h>
 
+#include <err.h>
+#include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+/*
+ * The root seed version is a 64-bit counter, but we truncate it to a 32-bit
+ * value on ILP32 userspace (including compat32).
+ */
+#ifdef __LP64__
+#define	fxrng_load_acq_generation(x)	atomic_load_acq_64(x)
+static uint64_t	*fxrng_root_generationp;
+#else
+#define	fxrng_load_acq_generation(x)	atomic_load_acq_32(x)
+static uint32_t	*fxrng_root_generationp;
+#endif
 
 static pthread_mutex_t	arc4random_mtx = PTHREAD_MUTEX_INITIALIZER;
 #define	_ARC4_LOCK()						\
@@ -50,10 +71,12 @@ _getentropy_fail(void)
 static inline int
 _rs_allocate(struct _rs **rsp, struct _rsx **rsxp)
 {
+	struct vdso_fxrng_generation *vdso_fxrngp;
 	struct {
 		struct _rs rs;
 		struct _rsx rsx;
 	} *p;
+	int error;
 
 	if ((p = mmap(NULL, sizeof(*p), PROT_READ|PROT_WRITE,
 	    MAP_ANON|MAP_PRIVATE, -1, 0)) == MAP_FAILED)
@@ -62,13 +85,51 @@ _rs_allocate(struct _rs **rsp, struct _rsx **rsxp)
 		munmap(p, sizeof(*p));
 		return (-1);
 	}
+	error = _elf_aux_info(AT_FXRNG, &vdso_fxrngp, sizeof(vdso_fxrngp));
+	if (error == 0) {
+		if (vdso_fxrngp->fx_vdso_version != VDSO_FXRNG_VER_1) {
+			munmap(p, sizeof(*p));
+			return (-1);
+		}
+
+#ifdef __LP64__
+		fxrng_root_generationp = &vdso_fxrngp->fx_generation;
+#else
+		fxrng_root_generationp = &vdso_fxrngp->fx_generation32;
+#endif
+	} else {
+#ifdef NOTYET
+		/*
+		 * Transition period: new userspace on old kernel.  Should
+		 * become a hard error at some point, if the scheme is adopted.
+		 */
+		errno = error;
+		return (-1);
+#endif
+	}
 
 	*rsp = &p->rs;
 	*rsxp = &p->rsx;
 	return (0);
 }
 
+/*
+ * This isn't detecting fork; we're just using the existing callback from
+ * _rs_stir_if_needed() to force arc4random(3) to reseed if the fenestrasX root
+ * seed version has changed.  (That is, the root random(4) has reseeded from
+ * pooled entropy.)
+ */
 static inline void
 _rs_forkdetect(void)
 {
+	if (__predict_false(rs == NULL || rsx == NULL))
+		return;
+	if (fxrng_root_generationp == NULL)
+		return;
+	if (__predict_true(rsx->rs_seed_generation ==
+	    fxrng_load_acq_generation(fxrng_root_generationp)))
+		return;
+
+	/* Invalidate rs_buf to force "stir" (reseed). */
+	memset(rs, 0, sizeof(*rs));
 }

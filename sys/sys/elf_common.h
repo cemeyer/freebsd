@@ -954,8 +954,9 @@ typedef struct {
 #define	AT_EHDRFLAGS	24	/* e_flags field from elf hdr */
 #define	AT_HWCAP	25	/* CPU feature flags. */
 #define	AT_HWCAP2	26	/* CPU feature flags 2. */
+#define	AT_FXRNG	27	/* Pointer to root RNG seed version. */
 
-#define	AT_COUNT	27	/* Count of defined aux entry types. */
+#define	AT_COUNT	28	/* Count of defined aux entry types. */
 
 /*
  * Relocation types.

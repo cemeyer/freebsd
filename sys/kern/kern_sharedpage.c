@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/rwlock.h>
+#include <sys/stddef.h>
 #include <sys/sysent.h>
 #include <sys/sysctl.h>
 #include <sys/vdso.h>
@@ -59,6 +60,10 @@ static struct sx shared_page_alloc_sx;
 static vm_object_t shared_page_obj;
 static int shared_page_free;
 char *shared_page_mapping;
+
+#ifdef RANDOM_FENESTRASX
+static struct vdso_fxrng_generation *fxrng_shpage_mapping;
+#endif
 
 void
 shared_page_write(int base, int size, const void *data)
@@ -256,10 +261,74 @@ alloc_sv_tk_compat32(void)
 }
 #endif
 
+#ifdef RANDOM_FENESTRASX
+void
+fxrng_push_seed_generation(uint64_t gen)
+{
+	if (fxrng_shpage_mapping == NULL)
+		return;
+#if defined(__LP64__)
+	atomic_store_rel_64(&fxrng_shpage_mapping->fx_generation, gen);
+#endif
+#if defined(COMPAT_FREEBSD32) || defined(__ILP32__)
+	KASSERT(gen < INT32_MAX,
+	    ("fxrng seed version shouldn't roll over a 32-bit counter "
+	     "for approximately 456,000 years"));
+	atomic_store_rel_32(&fxrng_shpage_mapping->fx_generation32,
+	    (uint32_t)gen);
+#endif
+}
+
+static void
+alloc_sv_fxrng_generation(void)
+{
+	int base;
+
+	/*
+	 * Allocate a full cache line for the fxrng root generation (64-bit
+	 * counter, or truncated 32-bit counter on ILP32 userspace).  It is
+	 * important that the line is not shared with frequently dirtied data,
+	 * and the shared page allocator lacks a __read_mostly mechanism.
+	 * However, PAGE_SIZE is typically large relative to the amount of
+	 * stuff we've got in it so far, so maybe the possible waste isn't an
+	 * issue.
+	 */
+	base = shared_page_alloc(CACHE_LINE_SIZE, CACHE_LINE_SIZE);
+	KASSERT(base != -1, ("%s: base allocation failed", __func__));
+	fxrng_shpage_mapping = (void *)(shared_page_mapping + base);
+	*fxrng_shpage_mapping = (struct vdso_fxrng_generation) {
+		.fx_vdso_version = VDSO_FXRNG_VER_CURR,
+	};
+}
+
+static int
+sysctl_fxrng_vdso(SYSCTL_HANDLER_ARGS)
+{
+	int vdso_enable, error;
+
+	vdso_enable = (fxrng_shpage_mapping != NULL &&
+	    fxrng_shpage_mapping->fx_vdso_version != VDSO_FXRNG_DISABLED);
+	error = sysctl_handle_int(oidp, &vdso_enable, 0, req);
+	if (error != 0)
+		return (error);
+	if (fxrng_shpage_mapping == NULL)
+		return (ENXIO);
+	fxrng_shpage_mapping->fx_vdso_version = (vdso_enable != 0) ?
+	    VDSO_FXRNG_VER_CURR : VDSO_FXRNG_DISABLED;
+	return (0);
+}
+SYSCTL_PROC(_debug, OID_AUTO, fxrng_vdso_enable,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
+    NULL, 0, sysctl_fxrng_vdso, "I", "Enable FXRNG VDSO");
+#endif
+
 void
 exec_sysvec_init(void *param)
 {
 	struct sysentvec *sv;
+#ifdef RANDOM_FENESTRASX
+	ptrdiff_t base;
+#endif
 
 	sv = (struct sysentvec *)param;
 	if ((sv->sv_flags & SV_SHP) == 0)
@@ -287,4 +356,16 @@ exec_sysvec_init(void *param)
 		}
 #endif
 	}
+#ifdef RANDOM_FENESTRASX
+	if ((sv->sv_flags & SV_RNG_SEED_VER) != 0) {
+		/*
+		 * Only allocate a single VDSO entry for multiple sysentvecs,
+		 * i.e., native and COMPAT32.
+		 */
+		if (fxrng_shpage_mapping == NULL)
+			alloc_sv_fxrng_generation();
+		base = (char *)fxrng_shpage_mapping - shared_page_mapping;
+		sv->sv_fxrng_gen_base = sv->sv_shared_page_base + base;
+	}
+#endif
 }
