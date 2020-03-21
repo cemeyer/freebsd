@@ -229,6 +229,10 @@ _INTERNALLIBS+= veriexec
 LIBVERIEXEC?=	${LIBVERIEXECDIR}/libveriexec${PIE_SUFFIX}.a
 .endif
 
+.if "NOT_YET" == "yes"
+_INTERNALLIBS+=	sodium
+.endif
+
 # Each library's LIBADD needs to be duplicated here for static linkage of
 # 2nd+ order consumers.  Auto-generating this would be better.
 _DP_80211=	sbuf bsdxml
@@ -478,6 +482,9 @@ LIBPE?=		${LIBPEDIR}/libpe${PIE_SUFFIX}.a
 
 LIBOPENBSDDIR=	${_LIB_OBJTOP}/lib/libopenbsd
 LIBOPENBSD?=	${LIBOPENBSDDIR}/libopenbsd${PIE_SUFFIX}.a
+
+LIBSODIUMDIR=	${_LIB_OBJTOP}/lib/libsodium
+LIBSODIUM?=	${LIBSODIUMDIR}/libsodium${PIE_SUFFIX}.a
 
 LIBSMDIR=	${_LIB_OBJTOP}/lib/libsm
 LIBSM?=		${LIBSMDIR}/libsm${PIE_SUFFIX}.a
