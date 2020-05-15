@@ -84,7 +84,7 @@ void kmem_init_zero_region(void);
 void kmeminit(void);
 
 int kernacc(void *, int, int);
-int useracc(void *, int, int);
+int useracc(void __user *, int, int);
 int vm_fault(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
     int fault_flags, vm_page_t *m_hold);
 void vm_fault_copy_entry(vm_map_t, vm_map_t, vm_map_entry_t, vm_map_entry_t,

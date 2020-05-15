@@ -226,7 +226,8 @@ sys_pread(struct thread *td, struct pread_args *uap)
 }
 
 int
-kern_pread(struct thread *td, int fd, void *buf, size_t nbyte, off_t offset)
+kern_pread(struct thread *td, int fd, void __user *buf, size_t nbyte,
+    off_t offset)
 {
 	struct uio auio;
 	struct iovec aiov;
@@ -427,7 +428,7 @@ sys_pwrite(struct thread *td, struct pwrite_args *uap)
 }
 
 int
-kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
+kern_pwrite(struct thread *td, int fd, const void __user *buf, size_t nbyte,
     off_t offset)
 {
 	struct uio auio;
@@ -436,7 +437,7 @@ kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	aiov.iov_base = (void *)(uintptr_t)buf;
+	aiov.iov_base = (void __force *)(uintptr_t)buf;
 	aiov.iov_len = nbyte;
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
@@ -904,8 +905,8 @@ sys_pselect(struct thread *td, struct pselect_args *uap)
 }
 
 int
-kern_pselect(struct thread *td, int nd, fd_set *in, fd_set *ou, fd_set *ex,
-    struct timeval *tvp, sigset_t *uset, int abi_nfdbits)
+kern_pselect(struct thread *td, int nd, fd_set __user *in, fd_set __user *ou,
+    fd_set __user *ex, struct timeval *tvp, sigset_t *uset, int abi_nfdbits)
 {
 	int error;
 
@@ -1002,8 +1003,9 @@ select_check_badfd(fd_set *fd_in, int nd, int ndu, int abi_nfdbits)
 }
 
 int
-kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
-    fd_set *fd_ex, struct timeval *tvp, int abi_nfdbits)
+kern_select(struct thread *td, int nd, fd_set __user *fd_in,
+    fd_set __user *fd_ou, fd_set __user *fd_ex, struct timeval *tvp,
+    int abi_nfdbits)
 {
 	struct filedesc *fdp;
 	/*
@@ -1347,7 +1349,7 @@ sys_poll(struct thread *td, struct poll_args *uap)
 }
 
 int
-kern_poll(struct thread *td, struct pollfd *ufds, u_int nfds,
+kern_poll(struct thread *td, struct pollfd __user *ufds, u_int nfds,
     struct timespec *tsp, sigset_t *uset)
 {
 	struct pollfd *kfds;

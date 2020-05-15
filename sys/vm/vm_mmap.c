@@ -196,11 +196,11 @@ kern_mmap_maxprot(struct proc *p, int prot)
 }
 
 int
-kern_mmap(struct thread *td, uintptr_t addr0, size_t len, int prot, int flags,
+kern_mmap(struct thread *td, void __user *addr0, size_t len, int prot, int flags,
     int fd, off_t pos)
 {
 	struct mmap_req mr = {
-		.mr_hint = addr0,
+		.mr_hint = (vm_offset_t __force)addr0,
 		.mr_len = len,
 		.mr_prot = prot,
 		.mr_flags = flags,
@@ -653,13 +653,13 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 }
 
 int
-kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
+kern_mprotect(struct thread *td, void __user *addr0, size_t size, int prot)
 {
 	vm_offset_t addr;
 	vm_size_t pageoff;
 	int vm_error, max_prot;
 
-	addr = addr0;
+	addr = (vm_offset_t __force)addr0;
 	if ((prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0)
 		return (EINVAL);
 	max_prot = PROT_MAX_EXTRACT(prot);

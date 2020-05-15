@@ -395,7 +395,7 @@ cpu_procctl_kpti(struct proc *p, int com, int *val)
 }
 
 int
-cpu_procctl(struct thread *td, int idtype, id_t id, int com, void *data)
+cpu_procctl(struct thread *td, int idtype, id_t id, int com, void __user *data)
 {
 	struct proc *p;
 	int error, val;

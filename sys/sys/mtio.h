@@ -221,7 +221,7 @@ typedef enum {
 
 struct mtextget {
 	uint32_t		alloc_len;
-	char			*status_xml;
+	char __user		*status_xml;
 	uint32_t		fill_len;
 	mt_ext_get_status	status;
 	char			error_str[128];

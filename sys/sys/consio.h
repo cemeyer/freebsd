@@ -231,8 +231,8 @@ typedef struct vfnt_map	vfnt_map_t;
 #define VFNT_MAP_BOLD_RIGHT	3
 #define VFNT_MAPS		4
 struct vfnt {
-	vfnt_map_t	*map[VFNT_MAPS];
-	uint8_t		*glyphs;
+	vfnt_map_t __user *map[VFNT_MAPS];
+	uint8_t __user	*glyphs;
 	unsigned int	map_count[VFNT_MAPS];
 	unsigned int	glyph_count;
 	unsigned int	width;
@@ -302,7 +302,7 @@ struct scrshot {
 	int		y;
 	int		xsize;
 	int		ysize;
-	u_int16_t*	buf;
+	u_int16_t __user *buf;
 };
 typedef struct scrshot scrshot_t;
 

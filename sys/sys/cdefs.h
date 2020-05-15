@@ -888,4 +888,25 @@
 #define	__guarded_by(x)		__lock_annotate(guarded_by(x))
 #define	__pt_guarded_by(x)	__lock_annotate(pt_guarded_by(x))
 
+/* User/kernel address space annotations for static analysis. */
+#ifdef __CHECKER__
+/* Sparse. */
+/*
+ * Force: type system escape; eventually it would be nice to drive uses of this
+ * down.
+ */
+#define	__force		__attribute__((force))
+/* User: tag for userspace pointers, which must not be accessed directly. */
+#define	__user		__attribute__((noderef, address_space(1)))
+/*
+ * Special annotation for parameter pointers which may be user or kernel, and
+ * which type is controlled by the 'enum uio_seg' type value in parameter 'n.'
+ */
+#define	__segarg(n)	__attribute__((noderef, address_space(100), segarg(n)))
+#else
+#define	__force
+#define	__user
+#define	__segarg(n)
+#endif
+
 #endif /* !_SYS_CDEFS_H_ */

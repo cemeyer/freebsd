@@ -262,7 +262,7 @@ cpu_exec_vmspace_reuse(struct proc *p __unused, vm_map_t map __unused)
 
 int
 cpu_procctl(struct thread *td __unused, int idtype __unused, id_t id __unused,
-    int com __unused, void *data __unused)
+    int com __unused, void __user *data __unused)
 {
 
 	return (EINVAL);

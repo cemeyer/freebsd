@@ -104,7 +104,7 @@ typedef enum {
 struct pass_io_req {
 	union ccb			 ccb;
 	union ccb			*alloced_ccb;
-	union ccb			*user_ccb_ptr;
+	union ccb __user		*user_ccb_ptr;
 	camq_entry			 user_periph_links;
 	ccb_ppriv_area			 user_periph_priv;
 	struct cam_periph_map_info	 mapinfo;
@@ -119,7 +119,7 @@ struct pass_io_req {
 	int				 num_bufs;
 	uint32_t			 dirs[CAM_PERIPH_MAXMAPS];
 	uint32_t			 lengths[CAM_PERIPH_MAXMAPS];
-	uint8_t				*user_bufs[CAM_PERIPH_MAXMAPS];
+	uint8_t __user			*user_bufs[CAM_PERIPH_MAXMAPS];
 	uint8_t				*kern_bufs[CAM_PERIPH_MAXMAPS];
 	struct bintime			 start_time;
 	TAILQ_ENTRY(pass_io_req)	 links;
@@ -1195,7 +1195,7 @@ passiocleanup(struct pass_softc *softc, struct pass_io_req *io_req)
 			 * previous values.
 			 */
 			if (io_req->user_bufs[i] != NULL)
-				*data_ptrs[i] = io_req->user_bufs[i];
+				*data_ptrs[i] = (void __force *)io_req->user_bufs[i];
 		}
 	}
 
@@ -1219,12 +1219,14 @@ passcopysglist(struct cam_periph *periph, struct pass_io_req *io_req,
 
 	for (i = 0, j = 0; i < io_req->num_user_segs &&
 	     j < io_req->num_kern_segs;) {
-		uint8_t *user_ptr, *kern_ptr;
+		uint8_t __user *user_ptr;
+		uint8_t *kern_ptr;
 
 		len_to_copy = min(user_sglist[i].ds_len -user_watermark,
 		    kern_sglist[j].ds_len - kern_watermark);
 
-		user_ptr = (uint8_t *)(uintptr_t)user_sglist[i].ds_addr;
+		/* XXX user/kernel rigor. */
+		user_ptr = (void __force __user *)(uintptr_t)user_sglist[i].ds_addr;
 		user_ptr = user_ptr + user_watermark;
 		kern_ptr = (uint8_t *)(uintptr_t)kern_sglist[j].ds_addr;
 		kern_ptr = kern_ptr + kern_watermark;
@@ -1407,7 +1409,7 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 	 * is whatever we're able to malloc.
 	 */
 	for (i = 0; i < numbufs; i++) {
-		io_req->user_bufs[i] = *data_ptrs[i];
+		io_req->user_bufs[i] = (void __force __user *)*data_ptrs[i];
 		io_req->dirs[i] = dirs[i];
 		io_req->lengths[i] = lengths[i];
 
@@ -1525,7 +1527,7 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 		io_req->num_kern_segs = num_segs_needed;
 
 		/* Save the user's S/G list pointer for later restoration */
-		io_req->user_bufs[0] = *data_ptrs[0];
+		io_req->user_bufs[0] = (void __force __user *)*data_ptrs[0];
 
 		/*
 		 * If we have enough segments allocated by default to handle
@@ -1538,12 +1540,12 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 		} else
 			io_req->user_segptr = io_req->user_segs;
 
-		error = copyin(*data_ptrs[0], io_req->user_segptr, sg_length);
+		error = copyin(io_req->user_bufs[0], io_req->user_segptr, sg_length);
 		if (error != 0) {
 			xpt_print(periph->path, "%s: copy of user S/G list "
 				  "from %p to %p failed with error %d\n",
-				  __func__, *data_ptrs[0], io_req->user_segptr,
-				  error);
+				  __func__, io_req->user_bufs[0],
+				  io_req->user_segptr, error);
 			goto bailout;
 		}
 
@@ -1626,7 +1628,7 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 		io_req->num_kern_segs = io_req->num_user_segs;
 
 		/* Save the user's S/G list pointer for later restoration */
-		io_req->user_bufs[0] = *data_ptrs[0];
+		io_req->user_bufs[0] = (void __force __user *)*data_ptrs[0];
 
 		if (num_segs > PASS_MAX_SEGS) {
 			io_req->user_segptr = malloc(sizeof(bus_dma_segment_t) *
@@ -1637,12 +1639,12 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 
 		io_req->kern_segptr = io_req->user_segptr;
 
-		error = copyin(*data_ptrs[0], io_req->user_segptr, sg_length);
+		error = copyin(io_req->user_bufs[0], io_req->user_segptr, sg_length);
 		if (error != 0) {
 			xpt_print(periph->path, "%s: copy of user S/G list "
 				  "from %p to %p failed with error %d\n",
-				  __func__, *data_ptrs[0], io_req->user_segptr,
-				  error);
+				  __func__, io_req->user_bufs[0],
+				  io_req->user_segptr, error);
 			goto bailout;
 		}
 		break;
@@ -1827,7 +1829,8 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 	case CAMIOQUEUE:
 	{
 		struct pass_io_req *io_req;
-		union ccb **user_ccb, *ccb;
+		union ccb __user **user_ccb;
+		union ccb *ccb;
 		xpt_opcode fc;
 
 #ifdef COMPAT_FREEBSD32
@@ -1850,7 +1853,8 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 
 		io_req = uma_zalloc(softc->pass_zone, M_WAITOK | M_ZERO);
 		ccb = &io_req->ccb;
-		user_ccb = (union ccb **)addr;
+		/* XXX User/kernel rigor. */
+		user_ccb = (union ccb __force __user **)addr;
 
 		/*
 		 * Unlike the CAMIOCOMMAND ioctl above, we only have a
@@ -1889,7 +1893,8 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 				error = EINVAL;
 				goto camioqueue_error;
 			}
-			error = copyin(ccb->csio.cdb_io.cdb_ptr,
+			error = copyin(
+			    (void __force __user *)ccb->csio.cdb_io.cdb_ptr,
 			    ccb->csio.cdb_io.cdb_bytes, ccb->csio.cdb_len);
 			if (error != 0)
 				goto camioqueue_error;
@@ -2006,7 +2011,7 @@ camioqueue_error:
 	}
 	case CAMIOGET:
 	{
-		union ccb **user_ccb;
+		union ccb __user **user_ccb;
 		struct pass_io_req *io_req;
 		int old_error;
 
@@ -2016,7 +2021,7 @@ camioqueue_error:
 			goto bailout;
 		}
 #endif
-		user_ccb = (union ccb **)addr;
+		user_ccb = (union ccb __force __user **)addr;
 		old_error = 0;
 
 		io_req = TAILQ_FIRST(&softc->done_queue);
@@ -2184,7 +2189,8 @@ passsendccb(struct cam_periph *periph, union ccb *ccb, union ccb *inccb)
 
 	if (ccb->ccb_h.flags & CAM_CDB_POINTER) {
 		cmd = __builtin_alloca(ccb->csio.cdb_len);
-		error = copyin(ccb->csio.cdb_io.cdb_ptr, cmd, ccb->csio.cdb_len);
+		error = copyin((void __force __user *)ccb->csio.cdb_io.cdb_ptr,
+		    cmd, ccb->csio.cdb_len);
 		if (error)
 			return (error);
 		ccb->csio.cdb_io.cdb_ptr = cmd;

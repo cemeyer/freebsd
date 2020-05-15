@@ -846,7 +846,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		break;
 
 	case GIO_KEYMAP:	/* get keyboard translation table */
-		error = copyout(kbd->kb_keymap, *(void **)arg,
+		error = copyout(kbd->kb_keymap, *(void __user **)arg,
 		    sizeof(keymap_t));
 		splx(s);
 		return (error);
@@ -877,7 +877,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 				mapp->key[i].flgs = omapp->key[i].flgs;
 			}
 		} else {
-			error = copyin(*(void **)arg, mapp, sizeof *mapp);
+			error = copyin(*(void __user **)arg, mapp, sizeof *mapp);
 			if (error != 0) {
 				splx(s);
 				free(mapp, M_TEMP);

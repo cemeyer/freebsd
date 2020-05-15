@@ -1059,7 +1059,7 @@ out:
 }
 
 static int
-recvit(struct thread *td, int s, struct msghdr *mp, void *namelenp)
+recvit(struct thread *td, int s, struct msghdr *mp, void __user *namelenp)
 {
 	int error;
 

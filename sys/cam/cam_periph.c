@@ -915,8 +915,8 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 		 * whatever extra space is necessary to make it to the page
 		 * boundary.
 		 */
-		misaligned[i] = (lengths[i] +
-		    (((vm_offset_t)(*data_ptrs[i])) & PAGE_MASK) > MAXPHYS);
+		misaligned[i] =
+		    (lengths[i] + pageoffset(*data_ptrs[i]) > MAXPHYS);
 	}
 
 	/*
@@ -932,7 +932,11 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 	for (i = 0; i < numbufs; i++) {
 
 		/* Save the user's data address. */
-		mapinfo->orig[i] = *data_ptrs[i];
+		/*
+		 * XXX: User/kernel pointers are not tracked rigorously in CAM
+		 * yet.
+		 */
+		mapinfo->orig[i] = (void __force __user *)*data_ptrs[i];
 
 		/*
 		 * For small buffers use malloc+copyin/copyout instead of
@@ -948,7 +952,9 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 				if (copyin(mapinfo->orig[i], *data_ptrs[i],
 				    lengths[i]) != 0) {
 					free(*data_ptrs[i], M_CAMPERIPH);
-					*data_ptrs[i] = mapinfo->orig[i];
+					/* XXX User/kernel rigor. */
+					*data_ptrs[i] =
+					    (void __force *)mapinfo->orig[i];
 					goto fail;
 				}
 			} else
@@ -1001,7 +1007,8 @@ fail:
 			uma_zfree(pbuf_zone, mapinfo->bp[i]);
 		} else
 			free(*data_ptrs[i], M_CAMPERIPH);
-		*data_ptrs[i] = mapinfo->orig[i];
+		/* XXX User/kernel rigor. */
+		*data_ptrs[i] = (void __force *)mapinfo->orig[i];
 	}
 	PRELE(curproc);
 	return(EACCES);
@@ -1108,7 +1115,8 @@ cam_periph_unmapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		}
 
 		/* Set the user's pointer back to the original value */
-		*data_ptrs[i] = mapinfo->orig[i];
+		/* XXX User/kernel rigor. */
+		*data_ptrs[i] = (void __force *)mapinfo->orig[i];
 	}
 
 	/* allow ourselves to be swapped once again */

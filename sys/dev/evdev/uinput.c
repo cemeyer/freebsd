@@ -595,7 +595,7 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 	case UI_SET_PHYS:
 		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
-		ret = copyinstr(*(void **)data, buf, sizeof(buf), NULL);
+		ret = copyinstr(*(void __user **)data, buf, sizeof(buf), NULL);
 		/* Linux returns EINVAL when string does not fit the buffer */
 		if (ret == ENAMETOOLONG)
 			ret = EINVAL;
@@ -607,7 +607,7 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 	case UI_SET_BSDUNIQ:
 		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
-		ret = copyinstr(*(void **)data, buf, sizeof(buf), NULL);
+		ret = copyinstr(*(void __user **)data, buf, sizeof(buf), NULL);
 		if (ret != 0)
 			return (ret);
 		evdev_set_serial(state->ucs_evdev, buf);

@@ -95,24 +95,26 @@ SDT_PROVIDER_DEFINE(vfs);
 SDT_PROBE_DEFINE2(vfs, , stat, mode, "char *", "int");
 SDT_PROBE_DEFINE2(vfs, , stat, reg, "char *", "int");
 
-static int kern_chflagsat(struct thread *td, int fd, const char *path,
-    enum uio_seg pathseg, u_long flags, int atflag);
+static int kern_chflagsat(struct thread *td, int fd,
+    const char __segarg(4) *path, enum uio_seg pathseg, u_long flags,
+    int atflag);
 static int setfflags(struct thread *td, struct vnode *, u_long);
-static int getutimes(const struct timeval *, enum uio_seg, struct timespec *);
-static int getutimens(const struct timespec *, enum uio_seg,
+static int getutimes(const struct timeval __segarg(2) *, enum uio_seg,
+    struct timespec *);
+static int getutimens(const struct timespec __segarg(2) *, enum uio_seg,
     struct timespec *, int *);
 static int setutimes(struct thread *td, struct vnode *,
     const struct timespec *, int, int);
 static int vn_access(struct vnode *vp, int user_flags, struct ucred *cred,
     struct thread *td);
-static int kern_fhlinkat(struct thread *td, int fd, const char *path,
-    enum uio_seg pathseg, fhandle_t *fhp);
+static int kern_fhlinkat(struct thread *td, int fd,
+    const char __segarg(4) *path, enum uio_seg pathseg, fhandle_t *fhp);
 static int kern_getfhat(struct thread *td, int flags, int fd,
-    const char *path, enum uio_seg pathseg, fhandle_t *fhp);
-static int kern_readlink_vp(struct vnode *vp, char *buf, enum uio_seg bufseg,
-    size_t count, struct thread *td);
+    const char __segarg(5) *path, enum uio_seg pathseg, fhandle_t *fhp);
+static int kern_readlink_vp(struct vnode *vp, char __segarg(3) *buf,
+    enum uio_seg bufseg, size_t count, struct thread *td);
 static int kern_linkat_vp(struct thread *td, struct vnode *vp, int fd,
-    const char *path, enum uio_seg segflag);
+    const char __segarg(5) *path, enum uio_seg segflag);
 
 int
 kern_sync(struct thread *td)
@@ -306,8 +308,8 @@ sys_statfs(struct thread *td, struct statfs_args *uap)
 }
 
 int
-kern_statfs(struct thread *td, const char *path, enum uio_seg pathseg,
-    struct statfs *buf)
+kern_statfs(struct thread *td, const char __segarg(3) *path,
+    enum uio_seg pathseg, struct statfs *buf)
 {
 	struct mount *mp;
 	struct nameidata nd;
@@ -877,7 +879,8 @@ sys_chdir(struct thread *td, struct chdir_args *uap)
 }
 
 int
-kern_chdir(struct thread *td, const char *path, enum uio_seg pathseg)
+kern_chdir(struct thread *td, const char __segarg(3) *path,
+    enum uio_seg pathseg)
 {
 	struct nameidata nd;
 	int error;
@@ -1033,8 +1036,8 @@ sys_openat(struct thread *td, struct openat_args *uap)
 }
 
 int
-kern_openat(struct thread *td, int fd, const char *path, enum uio_seg pathseg,
-    int flags, int mode)
+kern_openat(struct thread *td, int fd, const char __segarg(4) *path,
+    enum uio_seg pathseg, int flags, int mode)
 {
 	struct proc *p = td->td_proc;
 	struct filedesc *fdp = p->p_fd;
@@ -1230,8 +1233,8 @@ freebsd11_mknodat(struct thread *td,
 #endif /* COMPAT_FREEBSD11 */
 
 int
-kern_mknodat(struct thread *td, int fd, const char *path, enum uio_seg pathseg,
-    int mode, dev_t dev)
+kern_mknodat(struct thread *td, int fd, const char __segarg(4) *path,
+    enum uio_seg pathseg, int mode, dev_t dev)
 {
 	struct vnode *vp;
 	struct mount *mp;
@@ -1359,7 +1362,7 @@ sys_mkfifoat(struct thread *td, struct mkfifoat_args *uap)
 }
 
 int
-kern_mkfifoat(struct thread *td, int fd, const char *path,
+kern_mkfifoat(struct thread *td, int fd, const char __segarg(4) *path,
     enum uio_seg pathseg, int mode)
 {
 	struct mount *mp;
@@ -1511,8 +1514,8 @@ kern_linkat(struct thread *td, int fd1, int fd2, const char *path1,
 }
 
 static int
-kern_linkat_vp(struct thread *td, struct vnode *vp, int fd, const char *path,
-    enum uio_seg segflag)
+kern_linkat_vp(struct thread *td, struct vnode *vp, int fd,
+    const char __segarg(5) *path, enum uio_seg segflag)
 {
 	struct nameidata nd;
 	struct mount *mp;
@@ -1749,8 +1752,8 @@ sys_unlink(struct thread *td, struct unlink_args *uap)
 }
 
 static int
-kern_funlinkat_ex(struct thread *td, int dfd, const char *path, int fd,
-    int flag, enum uio_seg pathseg, ino_t oldinum)
+kern_funlinkat_ex(struct thread *td, int dfd, const char __segarg(6) *path,
+    int fd, int flag, enum uio_seg pathseg, ino_t oldinum)
 {
 
 	if ((flag & ~AT_REMOVEDIR) != 0)
@@ -1794,7 +1797,7 @@ sys_funlinkat(struct thread *td, struct funlinkat_args *uap)
 }
 
 int
-kern_funlinkat(struct thread *td, int dfd, const char *path, int fd,
+kern_funlinkat(struct thread *td, int dfd, const char __segarg(5) *path, int fd,
     enum uio_seg pathseg, int flag, ino_t oldinum)
 {
 	struct mount *mp;
@@ -2009,7 +2012,7 @@ sys_faccessat(struct thread *td, struct faccessat_args *uap)
 }
 
 int
-kern_accessat(struct thread *td, int fd, const char *path,
+kern_accessat(struct thread *td, int fd, const char __segarg(4) *path,
     enum uio_seg pathseg, int flag, int amode)
 {
 	struct ucred *cred, *usecred;
@@ -2322,7 +2325,7 @@ sys_fstatat(struct thread *td, struct fstatat_args *uap)
 }
 
 int
-kern_statat(struct thread *td, int flag, int fd, const char *path,
+kern_statat(struct thread *td, int flag, int fd, const char __segarg(5) *path,
     enum uio_seg pathseg, struct stat *sbp,
     void (*hook)(struct vnode *vp, struct stat *sbp))
 {
@@ -2477,8 +2480,8 @@ sys_lpathconf(struct thread *td, struct lpathconf_args *uap)
 }
 
 int
-kern_pathconf(struct thread *td, const char *path, enum uio_seg pathseg,
-    int name, u_long flags, long *valuep)
+kern_pathconf(struct thread *td, const char __segarg(3) *path,
+    enum uio_seg pathseg, int name, u_long flags, long *valuep)
 {
 	struct nameidata nd;
 	int error;
@@ -2528,8 +2531,9 @@ sys_readlinkat(struct thread *td, struct readlinkat_args *uap)
 }
 
 int
-kern_readlinkat(struct thread *td, int fd, const char *path,
-    enum uio_seg pathseg, char *buf, enum uio_seg bufseg, size_t count)
+kern_readlinkat(struct thread *td, int fd, const char __segarg(4) *path,
+    enum uio_seg pathseg, char __segarg(6) *buf, enum uio_seg bufseg,
+    size_t count)
 {
 	struct vnode *vp;
 	struct nameidata nd;
@@ -2556,8 +2560,8 @@ kern_readlinkat(struct thread *td, int fd, const char *path,
  * Helper function to readlink from a vnode
  */
 static int
-kern_readlink_vp(struct vnode *vp, char *buf, enum uio_seg bufseg, size_t count,
-    struct thread *td)
+kern_readlink_vp(struct vnode *vp, char __segarg(3) *buf, enum uio_seg bufseg,
+    size_t count, struct thread *td)
 {
 	struct iovec aiov;
 	struct uio auio;
@@ -2681,7 +2685,7 @@ sys_lchflags(struct thread *td, struct lchflags_args *uap)
 }
 
 static int
-kern_chflagsat(struct thread *td, int fd, const char *path,
+kern_chflagsat(struct thread *td, int fd, const char __segarg(4) *path,
     enum uio_seg pathseg, u_long flags, int atflag)
 {
 	struct nameidata nd;
@@ -2810,7 +2814,7 @@ sys_lchmod(struct thread *td, struct lchmod_args *uap)
 }
 
 int
-kern_fchmodat(struct thread *td, int fd, const char *path,
+kern_fchmodat(struct thread *td, int fd, const char __segarg(4) *path,
     enum uio_seg pathseg, mode_t mode, int flag)
 {
 	struct nameidata nd;
@@ -2922,7 +2926,7 @@ sys_fchownat(struct thread *td, struct fchownat_args *uap)
 }
 
 int
-kern_fchownat(struct thread *td, int fd, const char *path,
+kern_fchownat(struct thread *td, int fd, const char __segarg(4) *path,
     enum uio_seg pathseg, int uid, int gid, int flag)
 {
 	struct nameidata nd;
@@ -2990,7 +2994,7 @@ sys_fchown(struct thread *td, struct fchown_args *uap)
  * Common implementation code for utimes(), lutimes(), and futimes().
  */
 static int
-getutimes(const struct timeval *usrtvp, enum uio_seg tvpseg,
+getutimes(const struct timeval __segarg(2) *usrtvp, enum uio_seg tvpseg,
     struct timespec *tsp)
 {
 	struct timeval tv[2];
@@ -3024,7 +3028,7 @@ getutimes(const struct timeval *usrtvp, enum uio_seg tvpseg,
 #define	UTIMENS_NULL	0x1
 #define	UTIMENS_EXIT	0x2
 static int
-getutimens(const struct timespec *usrtsp, enum uio_seg tspseg,
+getutimens(const struct timespec __segarg(2) *usrtsp, enum uio_seg tspseg,
     struct timespec *tsp, int *retflags)
 {
 	struct timespec tsnow;
@@ -3135,8 +3139,9 @@ sys_futimesat(struct thread *td, struct futimesat_args *uap)
 }
 
 int
-kern_utimesat(struct thread *td, int fd, const char *path,
-    enum uio_seg pathseg, struct timeval *tptr, enum uio_seg tptrseg)
+kern_utimesat(struct thread *td, int fd, const char __segarg(4) *path,
+    enum uio_seg pathseg, struct timeval __segarg(6) *tptr,
+    enum uio_seg tptrseg)
 {
 	struct nameidata nd;
 	struct timespec ts[2];
@@ -3173,9 +3178,9 @@ sys_lutimes(struct thread *td, struct lutimes_args *uap)
 }
 
 int
-kern_lutimes(struct thread *td, const char *path, enum uio_seg pathseg,
-    struct timeval *tptr, enum uio_seg tptrseg)
-{
+kern_lutimes(struct thread *td, const char __segarg(3) *path,
+    enum uio_seg pathseg, struct timeval __segarg(5) *tptr,
+    enum uio_seg tptrseg) {
 	struct timespec ts[2];
 	struct nameidata nd;
 	int error;
@@ -3208,7 +3213,7 @@ sys_futimes(struct thread *td, struct futimes_args *uap)
 }
 
 int
-kern_futimes(struct thread *td, int fd, struct timeval *tptr,
+kern_futimes(struct thread *td, int fd, struct timeval __segarg(4) *tptr,
     enum uio_seg tptrseg)
 {
 	struct timespec ts[2];
@@ -3240,7 +3245,7 @@ sys_futimens(struct thread *td, struct futimens_args *uap)
 }
 
 int
-kern_futimens(struct thread *td, int fd, struct timespec *tptr,
+kern_futimens(struct thread *td, int fd, struct timespec __segarg(4) *tptr,
     enum uio_seg tptrseg)
 {
 	struct timespec ts[2];
@@ -3275,9 +3280,9 @@ sys_utimensat(struct thread *td, struct utimensat_args *uap)
 }
 
 int
-kern_utimensat(struct thread *td, int fd, const char *path,
-    enum uio_seg pathseg, struct timespec *tptr, enum uio_seg tptrseg,
-    int flag)
+kern_utimensat(struct thread *td, int fd, const char __segarg(4) *path,
+    enum uio_seg pathseg, struct timespec __segarg(6) *tptr,
+    enum uio_seg tptrseg, int flag)
 {
 	struct nameidata nd;
 	struct timespec ts[2];
@@ -3324,8 +3329,8 @@ sys_truncate(struct thread *td, struct truncate_args *uap)
 }
 
 int
-kern_truncate(struct thread *td, const char *path, enum uio_seg pathseg,
-    off_t length)
+kern_truncate(struct thread *td, const char __segarg(3) *path,
+    enum uio_seg pathseg, off_t length)
 {
 	struct mount *mp;
 	struct vnode *vp;
@@ -3662,8 +3667,8 @@ sys_mkdirat(struct thread *td, struct mkdirat_args *uap)
 }
 
 int
-kern_mkdirat(struct thread *td, int fd, const char *path, enum uio_seg segflg,
-    int mode)
+kern_mkdirat(struct thread *td, int fd, const char __segarg(4) *path,
+    enum uio_seg segflg, int mode)
 {
 	struct mount *mp;
 	struct vnode *vp;
@@ -3740,7 +3745,7 @@ sys_rmdir(struct thread *td, struct rmdir_args *uap)
 }
 
 int
-kern_frmdirat(struct thread *td, int dfd, const char *path, int fd,
+kern_frmdirat(struct thread *td, int dfd, const char __segarg(5) *path, int fd,
     enum uio_seg pathseg, int flag)
 {
 	struct mount *mp;
@@ -3828,8 +3833,8 @@ fdout:
 
 #if defined(COMPAT_43) || defined(COMPAT_FREEBSD11)
 int
-freebsd11_kern_getdirentries(struct thread *td, int fd, char *ubuf, u_int count,
-    long *basep, void (*func)(struct freebsd11_dirent *))
+freebsd11_kern_getdirentries(struct thread *td, int fd, char __user *ubuf,
+    u_int count, long *basep, void (*func)(struct freebsd11_dirent *))
 {
 	struct freebsd11_dirent dstdp;
 	struct dirent *dp, *edp;
@@ -4020,8 +4025,8 @@ sys_getdirentries(struct thread *td, struct getdirentries_args *uap)
 }
 
 int
-kern_getdirentries(struct thread *td, int fd, char *buf, size_t count,
-    off_t *basep, ssize_t *residp, enum uio_seg bufseg)
+kern_getdirentries(struct thread *td, int fd, char __segarg(7) *buf,
+    size_t count, off_t *basep, ssize_t *residp, enum uio_seg bufseg)
 {
 	struct vnode *vp;
 	struct file *fp;
@@ -4254,7 +4259,7 @@ sys_getfhat(struct thread *td, struct getfhat_args *uap)
 }
 
 static int
-kern_getfhat(struct thread *td, int flags, int fd, const char *path,
+kern_getfhat(struct thread *td, int flags, int fd, const char __segarg(5) *path,
     enum uio_seg pathseg, fhandle_t *fhp)
 {
 	struct nameidata nd;
@@ -4310,7 +4315,7 @@ sys_fhlinkat(struct thread *td, struct fhlinkat_args *uap)
 }
 
 static int
-kern_fhlinkat(struct thread *td, int fd, const char *path,
+kern_fhlinkat(struct thread *td, int fd, const char __segarg(4) *path,
     enum uio_seg pathseg, fhandle_t *fhp)
 {
 	fhandle_t fh;

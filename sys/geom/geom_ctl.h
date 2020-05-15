@@ -41,6 +41,10 @@
  */
 #define GCTL_VERSION	2
 
+/*
+ * XXX This is a datastructure where the name and value user pointers are
+ * reused after copying in the contents to kernel memory.
+ */
 struct gctl_req_arg {
 	u_int				nlen;
 	char				*name;
@@ -68,7 +72,7 @@ struct gctl_req {
 	u_int				narg;
 	struct gctl_req_arg		*arg;
 	u_int				lerror;
-	char				*error;
+	char __user			*error;
 	struct gctl_req_table		*reqt;
 
 	/* kernel only fields */

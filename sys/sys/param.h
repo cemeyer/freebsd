@@ -302,13 +302,17 @@
 #define	rounddown2(x, y) ((x)&(~((y)-1)))          /* if y is power of two */
 #define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
 #define	roundup2(x, y)	(((x)+((y)-1))&(~((y)-1))) /* if y is powers of two */
-#define powerof2(x)	((((x)-1)&(x))==0)
+#define	powerof2(x)	((((x)-1)&(x))==0)
+#define	pageoffset(p)	(((vm_offset_t __force)(p)) & PAGE_MASK)
 
 /* Macros for min/max. */
 #define	MIN(a,b) (((a)<(b))?(a):(b))
 #define	MAX(a,b) (((a)>(b))?(a):(b))
 
 #ifdef _KERNEL
+/* Rounddown2(), but for __user pointers. */
+#define	rounddown2user(x, y)	\
+    (void __force __user *)(((uintptr_t __force)x)&(~((y)-1)))
 /*
  * Basic byte order function prototypes for non-inline functions.
  */

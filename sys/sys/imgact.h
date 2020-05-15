@@ -75,17 +75,17 @@ struct image_params {
 	char *interpreter_name;	/* name of the interpreter */
 	void *auxargs;		/* ELF Auxinfo structure pointer */
 	struct sf_buf *firstpage;	/* first page that we mapped */
-	void *ps_strings;		/* pointer to ps_string (user space) */
+	void __user *ps_strings;	/* pointer to ps_string (user space) */
 	struct image_args *args;	/* system call arguments */
 	struct sysentvec *sysent;	/* system entry vector */
-	void *argv;			/* pointer to argv (user space) */
-	void *envv;			/* pointer to envv (user space) */
+	void __user *argv;		/* pointer to argv (user space) */
+	void __user *envv;		/* pointer to envv (user space) */
 	char *execpath;
-	void *execpathp;
+	void __user *execpathp;
 	char *freepath;
-	void *canary;
+	void __user *canary;
 	int canarylen;
-	void *pagesizes;
+	void __user *pagesizes;
 	int pagesizeslen;
 	vm_prot_t stack_prot;
 	u_long stack_sz;
@@ -106,8 +106,8 @@ int	exec_args_add_arg(struct image_args *args, const char *argp,
 	    enum uio_seg segflg);
 int	exec_args_add_env(struct image_args *args, const char *envp,
 	    enum uio_seg segflg);
-int	exec_args_add_fname(struct image_args *args, const char *fname,
-	    enum uio_seg segflg);
+int	exec_args_add_fname(struct image_args *args,
+	    const char __segarg(3) *fname, enum uio_seg segflg);
 int	exec_args_adjust_args(struct image_args *args, size_t consume,
 	    ssize_t extend);
 char	*exec_args_get_begin_envv(struct image_args *args);

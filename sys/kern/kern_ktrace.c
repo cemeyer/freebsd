@@ -789,8 +789,8 @@ ktrstruct_error(const char *name, const void *data, size_t datalen, int error)
 }
 
 void
-ktrstructarray(const char *name, enum uio_seg seg, const void *data,
-    int num_items, size_t struct_size)
+ktrstructarray(const char *name, enum uio_seg seg,
+    const void __segarg(2) *data, int num_items, size_t struct_size)
 {
 	struct ktr_request *req;
 	struct ktr_struct_array *ksa;

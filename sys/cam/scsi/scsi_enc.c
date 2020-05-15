@@ -364,10 +364,10 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 	encioc_elm_status_t elms;
 	encioc_elm_desc_t elmd;
 	encioc_elm_devnames_t elmdn;
-	encioc_element_t *uelm;
+	encioc_element_t __user *uelm;
 	enc_softc_t *enc;
 	enc_cache_t *cache;
-	void *addr;
+	void __user *addr;
 	int error, i;
 
 #ifdef	COMPAT_FREEBSD32
@@ -376,7 +376,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 #endif
 
 	if (arg_addr)
-		addr = *((caddr_t *) arg_addr);
+		addr = *((void __force __user **)arg_addr);
 	else
 		addr = NULL;
 
@@ -491,7 +491,7 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 		cam_periph_unlock(periph);
 		if (error == 0 || error == ENOMEM)
 			(void)copyout(&sstr.bufsiz,
-			    &((encioc_string_t *)addr)->bufsiz,
+			    &((encioc_string_t __user *)addr)->bufsiz,
 			    sizeof(sstr.bufsiz));
 		break;
 

@@ -238,7 +238,7 @@ freebsd32_ioctl(struct thread *td, struct freebsd32_ioctl_args *uap)
 		fdrop(fp, td);
 		ap.fd = uap->fd;
 		ap.com = uap->com;
-		PTRIN_CP(*uap, ap, data);
+		ap.data = (void __user *)uap->data;
 		return sys_ioctl(td, &ap);
 	}
 

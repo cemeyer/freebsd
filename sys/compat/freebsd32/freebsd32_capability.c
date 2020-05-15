@@ -90,7 +90,7 @@ freebsd32_cap_ioctls_get(struct thread *td,
 {
 	struct filedesc *fdp;
 	struct filedescent *fdep;
-	uint32_t *cmds32;
+	uint32_t __user *cmds32;
 	u_long *cmds;
 	size_t maxcmds;
 	int error, fd;

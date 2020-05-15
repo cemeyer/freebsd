@@ -46,8 +46,8 @@ struct ioctl_privcmd_mmapbatch {
 	int num;     /* number of pages to populate */
 	domid_t dom; /* target domain */
 	unsigned long addr;  /* virtual address */
-	const xen_pfn_t *arr; /* array of mfns */
-	int *err; /* array of error codes */
+	const xen_pfn_t __user *arr; /* array of mfns */
+	int __user *err; /* array of error codes */
 };
 
 #define IOCTL_PRIVCMD_HYPERCALL					\

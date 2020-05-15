@@ -114,12 +114,13 @@ struct iovec32;
 struct rusage32;
 int	freebsd32_copyout_strings(struct image_params *imgp,
 	    uintptr_t *stack_base);
-int	freebsd32_copyiniov(struct iovec32 *iovp, u_int iovcnt,
+int	freebsd32_copyiniov(struct iovec32 __user *iovp, u_int iovcnt,
 	    struct iovec **iov, int error);
 void	freebsd32_rusage_out(const struct rusage *s, struct rusage32 *s32);
 
 struct image_args;
-int freebsd32_exec_copyin_args(struct image_args *args, const char *fname,
-	    enum uio_seg segflg, u_int32_t *argv, u_int32_t *envv);
+int freebsd32_exec_copyin_args(struct image_args *args,
+    const char __segarg(3) *fname, enum uio_seg segflg, uint32_t __user *argv,
+    uint32_t __user *envv);
 
 #endif /* !_COMPAT_FREEBSD32_FREEBSD32_UTIL_H_ */

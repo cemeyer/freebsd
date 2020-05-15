@@ -40,6 +40,7 @@
 
 #ifdef _KERNEL
 #include <sys/queue.h>
+#include <sys/_uio.h>
 #endif
 
 struct thread;
@@ -1162,17 +1163,19 @@ int	kernel_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 int	kernel_sysctlbyname(struct thread *td, char *name, void *old,
 	    size_t *oldlenp, void *new, size_t newlen, size_t *retval,
 	    int flags);
-int	userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
-	    size_t *oldlenp, int inkernel, const void *new, size_t newlen,
+int	userland_sysctl(struct thread *td, int *name, u_int namelen,
+	    void __user *old, size_t __segarg(6) *oldlenp,
+	    enum uio_seg oldlenpseg, const void __user *new, size_t newlen,
 	    size_t *retval, int flags);
 int	sysctl_find_oid(int *name, u_int namelen, struct sysctl_oid **noid,
 	    int *nindx, struct sysctl_req *req);
 void	sysctl_wlock(void);
 void	sysctl_wunlock(void);
 int	sysctl_wire_old_buffer(struct sysctl_req *req, size_t len);
-int	kern___sysctlbyname(struct thread *td, const char *name,
-	    size_t namelen, void *old, size_t *oldlenp, void *new,
-	    size_t newlen, size_t *retval, int flags, bool inkernel);
+int	kern___sysctlbyname(struct thread *td, const char __user *name,
+	    size_t namelen, void __user *old, size_t __segarg(10) *oldlenp,
+	    void __user *new, size_t newlen, size_t *retval, int flags,
+	    enum uio_seg oldlenpseg);
 
 struct sbuf;
 struct sbuf *sbuf_new_for_sysctl(struct sbuf *, char *, int,

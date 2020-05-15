@@ -2190,7 +2190,7 @@ sys___sysctl(struct thread *td, struct sysctl_args *uap)
 		return (error);
 
 	error = userland_sysctl(td, name, uap->namelen,
-		uap->old, uap->oldlenp, 0,
+		uap->old, uap->oldlenp, UIO_USERSPACE,
 		uap->new, uap->newlen, &j, 0);
 	if (error && error != ENOMEM)
 		return (error);
@@ -2203,9 +2203,10 @@ sys___sysctl(struct thread *td, struct sysctl_args *uap)
 }
 
 int
-kern___sysctlbyname(struct thread *td, const char *oname, size_t namelen,
-    void *old, size_t *oldlenp, void *new, size_t newlen, size_t *retval,
-    int flags, bool inkernel)
+kern___sysctlbyname(struct thread *td, const char __user *oname,
+    size_t namelen, void __user *old, size_t __segarg(10) *oldlenp,
+    void __user *new, size_t newlen, size_t *retval, int flags,
+    enum uio_seg oldlenpseg)
 {
 	int oid[CTL_MAXNAME];
 	char namebuf[16];
@@ -2230,7 +2231,7 @@ kern___sysctlbyname(struct thread *td, const char *oname, size_t namelen,
 	if (error != 0)
 		goto out;
 	error = userland_sysctl(td, oid, *retval / sizeof(int), old, oldlenp,
-	    inkernel, new, newlen, retval, flags);
+	    oldlenpseg, new, newlen, retval, flags);
 
 out:
 	if (namelen > sizeof(namebuf))
@@ -2255,7 +2256,7 @@ sys___sysctlbyname(struct thread *td, struct __sysctlbyname_args *uap)
 	int error;
 
 	error = kern___sysctlbyname(td, uap->name, uap->namelen, uap->old,
-	    uap->oldlenp, uap->new, uap->newlen, &rv, 0, 0);
+	    uap->oldlenp, uap->new, uap->newlen, &rv, 0, UIO_USERSPACE);
 	if (error != 0)
 		return (error);
 	if (uap->oldlenp != NULL)
@@ -2269,9 +2270,9 @@ sys___sysctlbyname(struct thread *td, struct __sysctlbyname_args *uap)
  * must be in kernel space.
  */
 int
-userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
-    size_t *oldlenp, int inkernel, const void *new, size_t newlen,
-    size_t *retval, int flags)
+userland_sysctl(struct thread *td, int *name, u_int namelen, void __user *old,
+    size_t __segarg(6) *oldlenp, enum uio_seg oldlenpseg,
+    const void __user *new, size_t newlen, size_t *retval, int flags)
 {
 	int error = 0, memlocked;
 	struct sysctl_req req;
@@ -2282,7 +2283,7 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 	req.flags = flags;
 
 	if (oldlenp) {
-		if (inkernel) {
+		if (oldlenpseg != UIO_USERSPACE) {
 			req.oldlen = *oldlenp;
 		} else {
 			error = copyin(oldlenp, &req.oldlen, sizeof(*oldlenp));

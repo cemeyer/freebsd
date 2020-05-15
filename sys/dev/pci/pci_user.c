@@ -554,13 +554,14 @@ pci_conf_match(u_long cmd, struct pci_match_conf *matches, int num_matches,
  * pointer that cannot be dereferenced.
  */
 #define	PVE_NEXT_LEN(pve, datalen)					\
-	((struct pci_vpd_element *)((char *)(pve) +			\
+	((struct pci_vpd_element __user *)((char __user *)(pve) +	\
 	    sizeof(struct pci_vpd_element) + (datalen)))
 
 static int
 pci_list_vpd(device_t dev, struct pci_list_vpd_io *lvio)
 {
-	struct pci_vpd_element vpd_element, *vpd_user;
+	struct pci_vpd_element vpd_element;
+	struct pci_vpd_element __user *vpd_user;
 	struct pcicfg_vpd *vpd;
 	size_t len;
 	int error, i;
@@ -634,7 +635,7 @@ pci_list_vpd(device_t dev, struct pci_list_vpd_io *lvio)
 			return (error);
 		vpd_user = PVE_NEXT_LEN(vpd_user, vpd_element.pve_datalen);
 	}
-	KASSERT((char *)vpd_user - (char *)lvio->plvi_data == len,
+	KASSERT((char __user *)vpd_user - (char __user *)lvio->plvi_data == len,
 	    ("length mismatch"));
 	lvio->plvi_len = len;
 	return (0);
@@ -713,10 +714,10 @@ pci_conf_io_init(struct pci_conf_io *cio, caddr_t data, u_long cmd)
                cio32 = (struct pci_conf_io32 *)data;
                cio->pat_buf_len = cio32->pat_buf_len;
                cio->num_patterns = cio32->num_patterns;
-               cio->patterns = (void *)(uintptr_t)cio32->patterns;
+               cio->patterns = (void __force __user *)(uintptr_t)cio32->patterns;
                cio->match_buf_len = cio32->match_buf_len;
                cio->num_matches = cio32->num_matches;
-               cio->matches = (void *)(uintptr_t)cio32->matches;
+               cio->matches = (void __force __user *)(uintptr_t)cio32->matches;
                cio->offset = cio32->offset;
                cio->generation = cio32->generation;
                cio->status = cio32->status;
@@ -1123,7 +1124,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 
 				pci_conf_for_copyout(&dinfo->conf, &pcu, cmd);
 				error = copyout(&pcu,
-				    (caddr_t)cio->matches +
+				    cio->matches +
 				    confsz * cio->num_matches, confsz);
 				if (error)
 					break;

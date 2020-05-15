@@ -1389,14 +1389,15 @@ retry_einval:
 	}
 
 	/* Copy element status structures out to userspace. */
+	/* XXX user/kernel rigor. */
 	if (cmd == OCHIOGSTATUS)
 		error = copyout(user_data,
-				cesr->cesr_element_status,
+				(void __force __user *)cesr->cesr_element_status,
 				avail* (offsetof(struct changer_element_status,
 				ces_scsi_lun) + 1));
 	else
 		error = copyout(user_data,
-				cesr->cesr_element_status,
+				(void __force __user *)cesr->cesr_element_status,
 				avail * sizeof(struct changer_element_status));
 
 	cam_periph_lock(periph);

@@ -493,8 +493,8 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		if (sf == NULL)
 			return (KERN_FAILURE);
 		off = offset - trunc_page(offset);
-		error = copyout((caddr_t)sf_buf_kva(sf) + off, (caddr_t)start,
-		    end - start);
+		error = copyout((caddr_t)sf_buf_kva(sf) + off,
+		    (void __user *)start, end - start);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
 			return (KERN_FAILURE);
@@ -550,7 +550,7 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 			if (sz > PAGE_SIZE - off)
 				sz = PAGE_SIZE - off;
 			error = copyout((caddr_t)sf_buf_kva(sf) + off,
-			    (caddr_t)start, sz);
+			    (void __user *)start, sz);
 			vm_imgact_unmap_page(sf);
 			if (error != 0)
 				return (KERN_FAILURE);
@@ -661,8 +661,8 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 			return (EIO);
 
 		/* send the page fragment to user space */
-		error = copyout((caddr_t)sf_buf_kva(sf), (caddr_t)map_addr,
-		    copy_len);
+		error = copyout((caddr_t)sf_buf_kva(sf),
+		    (void __user *)map_addr, copy_len);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
 			return (error);
@@ -1385,7 +1385,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t base)
 	imgp->auxargs = NULL;
 	KASSERT(pos - argarray <= AT_COUNT, ("Too many auxargs"));
 
-	error = copyout(argarray, (void *)base, sizeof(*argarray) * AT_COUNT);
+	error = copyout(argarray, (void __user *)base,
+	    sizeof(*argarray) * AT_COUNT);
 	free(argarray, M_TEMP);
 	return (error);
 }
@@ -1393,13 +1394,13 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t base)
 int
 __elfN(freebsd_fixup)(uintptr_t *stack_base, struct image_params *imgp)
 {
-	Elf_Addr *base;
+	Elf_Addr __user *base;
 
-	base = (Elf_Addr *)*stack_base;
+	base = (void __user *)*stack_base;
 	base--;
 	if (suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
-	*stack_base = (uintptr_t)base;
+	*stack_base = (uintptr_t __force)base;
 	return (0);
 }
 
@@ -1448,8 +1449,8 @@ extern int compress_user_cores_level;
 
 static void cb_put_phdr(vm_map_entry_t, void *);
 static void cb_size_segment(vm_map_entry_t, void *);
-static int core_write(struct coredump_params *, const void *, size_t, off_t,
-    enum uio_seg);
+static int core_write(struct coredump_params *, const void __segarg(5) *,
+    size_t, off_t, enum uio_seg);
 static void each_dumpable_segment(struct thread *, segment_callback, void *);
 static int __elfN(corehdr)(struct coredump_params *, int, void *, size_t,
     struct note_info_list *, size_t);
@@ -1480,7 +1481,8 @@ static void note_procstat_vmmap(void *, struct sbuf *, size_t *);
  * Write out a core segment to the compression stream.
  */
 static int
-compress_chunk(struct coredump_params *p, char *base, char *buf, u_int len)
+compress_chunk(struct coredump_params *p, char __user *base, char *buf,
+    u_int len)
 {
 	u_int chunk_len;
 	int error;
@@ -1513,18 +1515,18 @@ core_compressed_write(void *base, size_t len, off_t offset, void *arg)
 }
 
 static int
-core_write(struct coredump_params *p, const void *base, size_t len,
+core_write(struct coredump_params *p, const void __segarg(5) *base, size_t len,
     off_t offset, enum uio_seg seg)
 {
 
-	return (vn_rdwr_inchunks(UIO_WRITE, p->vp, __DECONST(void *, base),
+	return (vn_rdwr_inchunks(UIO_WRITE, p->vp, __DECONST(void __force *, base),
 	    len, offset, seg, IO_UNIT | IO_DIRECT | IO_RANGELOCKED,
 	    p->active_cred, p->file_cred, NULL, p->td));
 }
 
 static int
-core_output(void *base, size_t len, off_t offset, struct coredump_params *p,
-    void *tmpbuf)
+core_output(void __user *base, size_t len, off_t offset,
+    struct coredump_params *p, void *tmpbuf)
 {
 	int error;
 
@@ -1671,7 +1673,8 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 		php = (Elf_Phdr *)((char *)hdr + sizeof(Elf_Ehdr)) + 1;
 		offset = round_page(hdrsize + notesz);
 		for (i = 0; i < seginfo.count; i++) {
-			error = core_output((caddr_t)(uintptr_t)php->p_vaddr,
+			error = core_output(
+			    (void __user *)(uintptr_t)php->p_vaddr,
 			    php->p_filesz, offset, &params, tmpbuf);
 			if (error != 0)
 				break;
@@ -2759,7 +2762,7 @@ __elfN(untrans_prot)(vm_prot_t prot)
 }
 
 void
-__elfN(stackgap)(struct image_params *imgp, uintptr_t *stack_base)
+__elfN(stackgap)(struct image_params *imgp, char __user **stack_base)
 {
 	uintptr_t range, rbase, gap;
 	int pct;

@@ -41,10 +41,10 @@
     {(pos)->a_type = (id); (pos)->a_un.a_val = (val); (pos)++;}
 #if (defined(__LP64__) && __ELF_WORD_SIZE == 32)
 #define	AUXARGS_ENTRY_PTR(pos, id, ptr) \
-    {(pos)->a_type = (id); (pos)->a_un.a_val = (uintptr_t)(ptr); (pos)++;}
+    {(pos)->a_type = (id); (pos)->a_un.a_val = (uintptr_t __force)(ptr); (pos)++;}
 #else
 #define	AUXARGS_ENTRY_PTR(pos, id, ptr) \
-    {(pos)->a_type = (id); (pos)->a_un.a_ptr = (ptr); (pos)++;}
+    {(pos)->a_type = (id); (pos)->a_un.a_ptr = (void __force *)(ptr); (pos)++;}
 #endif
 
 struct image_params;
@@ -105,7 +105,7 @@ int	__elfN(remove_brand_entry)(Elf_Brandinfo *entry);
 int	__elfN(freebsd_fixup)(uintptr_t *, struct image_params *);
 int	__elfN(coredump)(struct thread *, struct vnode *, off_t, int);
 size_t	__elfN(populate_note)(int, void *, void *, size_t, void **);
-void	__elfN(stackgap)(struct image_params *, uintptr_t *);
+void	__elfN(stackgap)(struct image_params *, char __user **);
 int	__elfN(freebsd_copyout_auxargs)(struct image_params *, uintptr_t);
 
 /* Machine specific function to dump per-thread information. */

@@ -757,7 +757,7 @@ devfs_ioctl_f(struct file *fp, u_long com, void *data, struct ucred *cred, struc
 	return (error);
 }
 
-void *
+void __user *
 fiodgname_buf_get_ptr(void *fgnp, u_long com)
 {
 	union {
@@ -773,7 +773,7 @@ fiodgname_buf_get_ptr(void *fgnp, u_long com)
 		return (fgnup->fgn.buf);
 #ifdef COMPAT_FREEBSD32
 	case FIODGNAME_32:
-		return ((void *)(uintptr_t)fgnup->fgn32.buf);
+		return ((void __force __user *)(uintptr_t)fgnup->fgn32.buf);
 #endif
 	default:
 		panic("Unhandled ioctl command %ld", com);

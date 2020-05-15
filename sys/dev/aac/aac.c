@@ -195,7 +195,7 @@ static d_open_t		aac_open;
 static d_ioctl_t	aac_ioctl;
 static d_poll_t		aac_poll;
 static void		aac_cdevpriv_dtor(void *arg);
-static int		aac_ioctl_sendfib(struct aac_softc *sc, caddr_t ufib);
+static int		aac_ioctl_sendfib(struct aac_softc *sc, char __user *ufib);
 static int		aac_ioctl_send_raw_srb(struct aac_softc *sc, caddr_t arg);
 static void		aac_handle_aif(struct aac_softc *sc,
 					   struct aac_fib *fib);
@@ -2840,13 +2840,15 @@ aac_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 	case FSACTL_LNX_SENDFIB:
 	case FSACTL_LNX_SEND_LARGE_FIB:
 		fwprintf(sc, HBA_FLAGS_DBG_IOCTL_COMMANDS_B, "FSACTL_SENDFIB");
-		error = aac_ioctl_sendfib(sc, arg);
+		/* Arg is copyin()ed.  This is probably wrong? */
+		error = aac_ioctl_sendfib(sc, (void __force __user *)arg);
 		break;
 	case FSACTL_SEND_RAW_SRB:
 		arg = *(caddr_t*)arg;
 	case FSACTL_LNX_SEND_RAW_SRB:
 		fwprintf(sc, HBA_FLAGS_DBG_IOCTL_COMMANDS_B, "FSACTL_SEND_RAW_SRB");
-		error = aac_ioctl_send_raw_srb(sc, arg);
+		/* Arg is copyin()ed.  This is probably wrong? */
+		error = aac_ioctl_send_raw_srb(sc, (void __force __user *)arg);
 		break;
 	case FSACTL_AIF_THREAD:
 	case FSACTL_LNX_AIF_THREAD:
@@ -2964,7 +2966,7 @@ aac_ioctl_event(struct aac_softc *sc, struct aac_event *event, void *arg)
  * Send a FIB supplied from userspace
  */
 static int
-aac_ioctl_sendfib(struct aac_softc *sc, caddr_t ufib)
+aac_ioctl_sendfib(struct aac_softc *sc, char __user *ufib)
 {
 	struct aac_command *cm;
 	int size, error;
@@ -3048,12 +3050,13 @@ out:
  * Send a passthrough FIB supplied from userspace
  */
 static int
-aac_ioctl_send_raw_srb(struct aac_softc *sc, caddr_t arg)
+aac_ioctl_send_raw_srb(struct aac_softc *sc, void __user *arg)
 {
 	struct aac_command *cm;
 	struct aac_event *event;
 	struct aac_fib *fib;
-	struct aac_srb *srbcmd, *user_srb;
+	struct aac_srb *srbcmd;
+	struct aac_srb __user *user_srb;
 	struct aac_sg_entry *sge;
 	struct aac_sg_entry64 *sge64;
 	void *srb_sg_address, *ureply;
@@ -3065,7 +3068,7 @@ aac_ioctl_send_raw_srb(struct aac_softc *sc, caddr_t arg)
 	cm = NULL;
 	transfer_data = 0;
 	fibsize = 0;
-	user_srb = (struct aac_srb *)arg;
+	user_srb = arg;
 
 	mtx_lock(&sc->aac_io_lock);
 	if (aac_alloc_command(sc, &cm)) {

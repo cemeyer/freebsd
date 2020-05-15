@@ -369,47 +369,48 @@ void	*memmove_early(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 int	copystr(const void * _Nonnull __restrict kfaddr,
 	    void * _Nonnull __restrict kdaddr, size_t len,
 	    size_t * __restrict lencopied);
-int	copyinstr(const void * __restrict udaddr,
+int	copyinstr(const void __user * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len,
 	    size_t * __restrict lencopied);
-int	copyin(const void * __restrict udaddr,
+int	copyin(const void __user * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
-int	copyin_nofault(const void * __restrict udaddr,
+int	copyin_nofault(const void __user * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 int	copyout(const void * _Nonnull __restrict kaddr,
-	    void * __restrict udaddr, size_t len);
+	    void __user * __restrict udaddr, size_t len);
 int	copyout_nofault(const void * _Nonnull __restrict kaddr,
-	    void * __restrict udaddr, size_t len);
+	    void __user * __restrict udaddr, size_t len);
 
 #ifdef KCSAN
 int	kcsan_copystr(const void *, void *, size_t, size_t *);
-int	kcsan_copyin(const void *, void *, size_t);
-int	kcsan_copyinstr(const void *, void *, size_t, size_t *);
-int	kcsan_copyout(const void *, void *, size_t);
+int	kcsan_copyin(const void __user *, void *, size_t);
+int	kcsan_copyinstr(const void __user *, void *, size_t, size_t *);
+int	kcsan_copyout(const void *, void __user *, size_t);
 #define	copystr(kf, k, l, lc) kcsan_copystr((kf), (k), (l), (lc))
 #define	copyin(u, k, l) kcsan_copyin((u), (k), (l))
 #define	copyinstr(u, k, l, lc) kcsan_copyinstr((u), (k), (l), (lc))
 #define	copyout(k, u, l) kcsan_copyout((k), (u), (l))
 #endif
 
-int	fubyte(volatile const void *base);
-long	fuword(volatile const void *base);
-int	fuword16(volatile const void *base);
-int32_t	fuword32(volatile const void *base);
-int64_t	fuword64(volatile const void *base);
-int	fueword(volatile const void *base, long *val);
-int	fueword32(volatile const void *base, int32_t *val);
-int	fueword64(volatile const void *base, int64_t *val);
-int	subyte(volatile void *base, int byte);
-int	suword(volatile void *base, long word);
-int	suword16(volatile void *base, int word);
-int	suword32(volatile void *base, int32_t word);
-int	suword64(volatile void *base, int64_t word);
-uint32_t casuword32(volatile uint32_t *base, uint32_t oldval, uint32_t newval);
-u_long	casuword(volatile u_long *p, u_long oldval, u_long newval);
-int	casueword32(volatile uint32_t *base, uint32_t oldval, uint32_t *oldvalp,
+int	fubyte(volatile const void __user *base);
+long	fuword(volatile const void __user *base);
+int	fuword16(volatile const void __user *base);
+int32_t	fuword32(volatile const void __user *base);
+int64_t	fuword64(volatile const void __user *base);
+int	fueword(volatile const void __user *base, long *val);
+int	fueword32(volatile const void __user *base, int32_t *val);
+int	fueword64(volatile const void __user *base, int64_t *val);
+int	subyte(volatile void __user *base, int byte);
+int	suword(volatile void __user *base, long word);
+int	suword16(volatile void __user *base, int word);
+int	suword32(volatile void __user *base, int32_t word);
+int	suword64(volatile void __user *base, int64_t word);
+uint32_t casuword32(volatile uint32_t __user *base, uint32_t oldval,
 	    uint32_t newval);
-int	casueword(volatile u_long *p, u_long oldval, u_long *oldvalp,
+u_long	casuword(volatile u_long __user *p, u_long oldval, u_long newval);
+int	casueword32(volatile uint32_t __user *base, uint32_t oldval,
+	    uint32_t *oldvalp, uint32_t newval);
+int	casueword(volatile u_long __user *p, u_long oldval, u_long *oldvalp,
 	    u_long newval);
 
 void	realitexpire(void *);

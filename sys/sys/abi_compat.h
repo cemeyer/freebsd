@@ -74,4 +74,14 @@
 	*(uint64_t *)&(dst).fld.frac[0] = (src).fld.frac;	\
 } while (0)
 
+/*
+ * Similar to PTRIN(), but used in contexts which intend to actually
+ * dereference an un-annotated user pointer (such as copyin(9)) rather than
+ * just copy.  (For ABI reasons, some userspace datastructures contain pointers
+ * which are spelled as integer types, like uint32_t; they cannot be correctly
+ * __user-annotated in-place.)
+ */
+
+#define	UABIPTR(v)	(void __force __user *)(uintptr_t)(v)
+
 #endif /* !_COMPAT_H_ */

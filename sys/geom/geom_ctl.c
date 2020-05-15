@@ -125,7 +125,7 @@ geom_alloc_copyin(struct gctl_req *req, void *uaddr, size_t len)
 	void *ptr;
 
 	ptr = g_malloc(len, M_WAITOK);
-	req->nerror = copyin(uaddr, ptr, len);
+	req->nerror = copyin((void __force __user *)uaddr, ptr, len);
 	if (!req->nerror)
 		return (ptr);
 	g_free(ptr);
@@ -208,7 +208,8 @@ gctl_copyout(struct gctl_req *req)
 	for (i = 0; i < req->narg; i++, ap++) {
 		if (!(ap->flag & GCTL_PARAM_CHANGED))
 			continue;
-		error = copyout(ap->kvalue, ap->value, ap->len);
+		error = copyout(ap->kvalue, (void __force __user *)ap->value,
+		    ap->len);
 		if (!error)
 			continue;
 		req->nerror = error;

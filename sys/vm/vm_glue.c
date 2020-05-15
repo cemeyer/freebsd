@@ -148,7 +148,7 @@ kernacc(void *addr, int len, int rw)
  * used in conjunction with this call.
  */
 int
-useracc(void *addr, int len, int rw)
+useracc(void __user *addr, int len, int rw)
 {
 	boolean_t rv;
 	vm_prot_t prot;

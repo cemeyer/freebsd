@@ -1113,7 +1113,7 @@ sctty_ioctl(struct tty *tp, u_long cmd, caddr_t data, struct thread *td)
 		vm_offset_t frbp, hstp;
 		unsigned lnum;
 		scrshot_t *ptr = (scrshot_t *)data;
-		void *outp = ptr->buf;
+		char __user *outp = (void __user *)ptr->buf;
 
 		if (ptr->x < 0 || ptr->y < 0 || ptr->xsize < 0 ||
 		    ptr->ysize < 0)
@@ -1136,7 +1136,7 @@ sctty_ioctl(struct tty *tp, u_long cmd, caddr_t data, struct thread *td)
 		frbp = scp->vtb.vtb_buffer + scp->ysize * lsize +
 		    ptr->x * sizeof(u_int16_t);
 		/* Pointer to the last line of target buffer */
-		outp = (char *)outp + ptr->ysize * csize;
+		outp = outp + ptr->ysize * csize;
 		/* Pointer to the last line of history buffer */
 		if (scp->history != NULL)
 			hstp = scp->history->vtb_buffer +
@@ -1157,7 +1157,7 @@ sctty_ioctl(struct tty *tp, u_long cmd, caddr_t data, struct thread *td)
 			}
 			if (lnum < ptr->y)
 				continue;
-			outp = (char *)outp - csize;
+			outp = outp - csize;
 			retval = copyout((void *)frbp, outp, csize);
 			if (retval != 0)
 				break;
