@@ -818,18 +818,18 @@ static void
 ses_devids_iter(enc_softc_t *enc, enc_element_t *elm,
 		ses_devid_callback_t *callback, void *callback_arg)
 {
+#define	DEVID_SZ	(SVPD_DEVICE_ID_DESC_HDR_LEN + \
+    sizeof(struct scsi_vpd_id_naa_ieee_reg))
+	uint8_t			devid_buf[DEVID_SZ];
+#undef	DEVID_SZ
 	ses_element_t           *elmpriv;
 	struct ses_addl_status *addl;
 	u_int                   i;
-	size_t			devid_record_size;
 
 	elmpriv = elm->elm_private;
 	addl = &(elmpriv->addl);
 
-	devid_record_size = SVPD_DEVICE_ID_DESC_HDR_LEN
-			  + sizeof(struct scsi_vpd_id_naa_ieee_reg);
 	for (i = 0; i < addl->proto_hdr.sas->base_hdr.num_phys; i++) {
-		uint8_t			       devid_buf[devid_record_size];
 		struct scsi_vpd_id_descriptor *devid;
 		uint8_t			      *phy_addr;
 
