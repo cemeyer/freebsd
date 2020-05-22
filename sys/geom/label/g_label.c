@@ -119,14 +119,13 @@ g_label_rtrim(char *label, size_t size)
 
 static int
 g_label_destroy_geom(struct gctl_req *req __unused, struct g_class *mp,
-    struct g_geom *gp __unused)
+    struct g_geom *gp)
 {
+	G_LABEL_DEBUG(2, "%s(%s,%s)", __func__, mp->name, gp->name);
+	g_topology_assert();
 
-	/*
-	 * XXX: Unloading a class which is using geom_slice:1.56 is currently
-	 * XXX: broken, so we deny unloading when we have geoms.
-	 */
-	return (EOPNOTSUPP);
+	g_wither_geom(gp, EINVAL);
+	return (0);
 }
 
 static void
@@ -135,7 +134,7 @@ g_label_orphan(struct g_consumer *cp)
 
 	G_LABEL_DEBUG(1, "Label %s removed.",
 	    LIST_FIRST(&cp->geom->provider)->name);
-	g_slice_orphan(cp);
+	g_wither_geom(cp->geom, ENXIO);
 }
 
 static void
@@ -144,7 +143,8 @@ g_label_spoiled(struct g_consumer *cp)
 
 	G_LABEL_DEBUG(1, "Label %s removed.",
 	    LIST_FIRST(&cp->geom->provider)->name);
-	g_slice_spoiled(cp);
+	cp->flags |= G_CF_ORPHAN;
+	g_wither_geom(cp->geom, ENXIO);
 }
 
 static void
@@ -211,15 +211,10 @@ g_label_mangle_name(char *label, size_t size)
 	sbuf_delete(sb);
 }
 
-static struct g_geom *
-g_label_create(struct gctl_req *req, struct g_class *mp, struct g_provider *pp,
-    const char *label, const char *dir, off_t mediasize)
+static void
+g_label_create(struct gctl_req *req, struct g_provider *pp, const char *label,
+    const char *dir)
 {
-	struct g_geom *gp;
-	struct g_provider *pp2;
-	struct g_consumer *cp;
-	char name[64];
-
 	g_topology_assert();
 
 	if (!g_label_is_name_ok(label)) {
@@ -228,52 +223,17 @@ g_label_create(struct gctl_req *req, struct g_class *mp, struct g_provider *pp,
 		G_LABEL_DEBUG(1, "%s suspicious label is: %s", pp->name, label);
 		if (req != NULL)
 			gctl_error(req, "Label name %s is invalid.", label);
-		return (NULL);
+		return;
 	}
-	gp = NULL;
-	cp = NULL;
-	if (snprintf(name, sizeof(name), "%s/%s", dir, label) >= sizeof(name)) {
-		if (req != NULL)
-			gctl_error(req, "Label name %s is too long.", label);
-		return (NULL);
-	}
-	LIST_FOREACH(gp, &mp->geom, geom) {
-		pp2 = LIST_FIRST(&gp->provider);
-		if (pp2 == NULL)
-			continue;
-		if ((pp2->flags & G_PF_ORPHAN) != 0)
-			continue;
-		if (strcmp(pp2->name, name) == 0) {
-			G_LABEL_DEBUG(1, "Label %s(%s) already exists (%s).",
-			    label, name, pp->name);
-			if (req != NULL) {
-				gctl_error(req, "Provider %s already exists.",
-				    name);
-			}
-			return (NULL);
-		}
-	}
-	gp = g_slice_new(mp, 1, pp, &cp, NULL, 0, NULL);
-	if (gp == NULL) {
-		G_LABEL_DEBUG(0, "Cannot create slice %s.", label);
-		if (req != NULL)
-			gctl_error(req, "Cannot create slice %s.", label);
-		return (NULL);
-	}
-	gp->orphan = g_label_orphan;
-	gp->spoiled = g_label_spoiled;
-	gp->resize = g_label_resize;
-	g_access(cp, -1, 0, 0);
-	g_slice_config(gp, 0, G_SLICE_CONFIG_SET, (off_t)0, mediasize,
-	    pp->sectorsize, "%s", name);
-	G_LABEL_DEBUG(1, "Label for provider %s is %s.", pp->name, name);
-	return (gp);
+
+	g_provider_add_alias(pp, "%s/%s", dir, label);
 }
 
 static int
 g_label_destroy(struct g_geom *gp, boolean_t force)
 {
 	struct g_provider *pp;
+	struct g_consumer *cp;
 
 	g_topology_assert();
 	pp = LIST_FIRST(&gp->provider);
@@ -289,7 +249,18 @@ g_label_destroy(struct g_geom *gp, boolean_t force)
 		}
 	} else if (pp != NULL)
 		G_LABEL_DEBUG(1, "Label %s removed.", pp->name);
-	g_slice_spoiled(LIST_FIRST(&gp->consumer));
+
+	cp = LIST_FIRST(&gp->consumer);
+	cp->flags |= G_CF_ORPHAN;
+	g_wither_geom(gp, ENXIO);
+
+	/*
+	 * We can safely free the softc now if there are no accesses.
+	 */
+#if 0
+	if ((cp->acr + cp->acw + cp->ace) == 0)
+		g_slice_free(gp);
+#endif
 	return (0);
 }
 
@@ -352,10 +323,7 @@ g_label_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 
 	G_LABEL_DEBUG(2, "Tasting %s.", pp->name);
 
-	/* Skip providers that are already open for writing. */
-	if (pp->acw > 0)
-		return (NULL);
-
+	/* Don't taste ourself. */
 	if (strcmp(pp->geom->class->name, mp->name) == 0)
 		return (NULL);
 
@@ -391,8 +359,7 @@ g_label_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 		if (md.md_provsize != pp->mediasize)
 			break;
 
-		g_label_create(NULL, mp, pp, md.md_label, G_LABEL_DIR,
-		    pp->mediasize - pp->sectorsize);
+		g_label_create(NULL, pp, md.md_label, G_LABEL_DIR);
 	} while (0);
 	for (i = 0; g_labels[i] != NULL; i++) {
 		char label[128];
@@ -405,8 +372,7 @@ g_label_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 		g_topology_lock();
 		if (label[0] == '\0')
 			continue;
-		g_label_create(NULL, mp, pp, label, g_labels[i]->ld_dir,
-		    pp->mediasize);
+		g_label_create(NULL, pp, label, g_labels[i]->ld_dir);
 	}
 	g_access(cp, -1, 0, 0);
 end:
@@ -458,7 +424,7 @@ g_label_ctl_create(struct gctl_req *req, struct g_class *mp)
 		gctl_error(req, "No 'arg%d' argument", 0);
 		return;
 	}
-	g_label_create(req, mp, pp, name, G_LABEL_DIR, pp->mediasize);
+	g_label_create(req, pp, name, G_LABEL_DIR);
 }
 
 static const char *
